@@ -1,41 +1,3 @@
-function Write-RptHeader {
-  param (
-    $TenName
-  )
-$rHeader = '<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>Tenant Settings Report</title>
-<style>
-  table, th, td {
-  border: 2px solid black;
-  border-collapse: collapse;
-}
-  th, td {
-  padding: .1em .5em;
-}
-  th {
-  text-align: left;
-}
-</style>
-</head>
-<body>
-<h1>Tenant Report for: ' 
-
-  if ($RptTenant -ne "") {
-    $RptHeader = $rHeader + $TenName + '</h1>'
-  }
-  else {
-    $RptHeader = $rHeader + '&nbsp;</h1>'
-  }
-
-# Create file by redirecting to a file
-$RptHeader > $RptName
-
-  return 0
-}
-
 function Make-TH { 
 	param (
         $tData
@@ -73,76 +35,6 @@ function Count-UsersInDomain {
     $domUsers = (Get-AzureADUser -all $true | Where-Object {$_.UserPrincipalName -like ("*" + ($domData))}).count
   }
   return $domUsers
-}
-
-function Rpt-Domains {
-# -----------------------------------------------------------------------------------------------
-#
-# BEGIN - report Domains
-#
-# -----------------------------------------------------------------------------------------------
-# Get the collection of VerifiedDomains - it is a collection in a collection - too hard to loop through
-$DomCollection = Get-AzureADTenantDetail| select VerifiedDomains
-$Doms = $DomCollection[0].VerifiedDomains |sort-object -Property "Name"
-# Get the AZ list of all domains 
-$DomList = Get-AzureADDomain | sort-object -Property "Name"
-
-# Var will hold Capabilities value 
-$Cap = "none"
-
-# Write the Domains table header
-Add-Content -Path $RptName -Value ('<h2>Directory - Domains</h2>')
-Add-Content -Path $RptName -Value ('<table>')
-Add-Content -Path $RptName -Value " <tr>"
-Add-Content -Path $RptName -Value (Make-TH("Name") )
-Add-Content -Path $RptName -Value (Make-TH("Verified") )
-Add-Content -Path $RptName -Value (Make-TH("Root") )
-Add-Content -Path $RptName -Value (Make-TH("Initial") )
-Add-Content -Path $RptName -Value (Make-TH("Default") )
-Add-Content -Path $RptName -Value (Make-TH("Authentication") )
-Add-Content -Path $RptName -Value (Make-TH("Capabilities") )
-Add-Content -Path $RptName -Value (Make-TH("State") )
-Add-Content -Path $RptName -Value (Make-TH("Availability Status") )
-Add-Content -Path $RptName -Value (Make-TH("User Count") )
-Add-Content -Path $RptName -Value " </tr>"
-
-# Write the Domains table content
-$i = 0
-foreach ($_ in $DomList) {
-	Add-Content -Path $RptName -Value " <tr>"
-	Add-Content -Path $RptName -Value (Make-TD($DomList[$i].Name) )
-	Add-Content -Path $RptName -Value (Make-TD($DomList[$i].IsVerified) )
-	Add-Content -Path $RptName -Value (Make-TD($DomList[$i].IsRoot) )
-	Add-Content -Path $RptName -Value (Make-TD($DomList[$i].IsInitial) )
-	Add-Content -Path $RptName -Value (Make-TD($DomList[$i].IsDefault) )
-	Add-Content -Path $RptName -Value (Make-TD($DomList[$i].AuthenticationType) )
-# look up the domain in the other list and get the Capabilities
-$y=0
-foreach ($_ in $Doms) {
-	if ((($Doms[$y].Name)) -eq ($DomList[$i].Name)) {
-	  $Cap = (($Doms[$y].Name))
-    }
-	$y++
-}
-  Add-Content -Path $RptName -Value (Make-TD($Cap) )
-  Add-Content -Path $RptName -Value (Make-TD($DomList[$i].State) )
-  Add-Content -Path $RptName -Value (Make-TD($DomList[$i].AvailabilityStatus) )
-# Look for user objects with this domain suffix in their UPN
-#  $ThisDomain = "*" + ($Doms[$i].Name)
-#  $UsrCnt = (Get-AzureADUser -all $true | Where-Object {$_.UserPrincipalName -like $ThisDomain}).count
-
-  $UsrCnt = Count-UsersInDomain(($DomList[$i].Name))
-  Add-Content -Path $RptName -Value (Make-TD($UsrCnt.ToString()) )
-  Add-Content -Path $RptName -Value " </tr>"
-  $i++
-}
-Add-Content -Path $RptName -Value ('</table>')
-# -----------------------------------------------------------------------------------------------
-#
-# END - report Domains
-#
-# -----------------------------------------------------------------------------------------------
-	
 }
 
 function Rpt-DirectorySettings {
@@ -232,6 +124,73 @@ Add-Content -Path $RptName -Value (Make-TH("TelephoneNumber"))
 Add-Content -Path $RptName -Value (Make-TD($td.TelephoneNumber))
 Add-Content -Path $RptName -Value ' </tr>'
 Add-Content -Path $RptName -Value '</table>'
+# -----------------------------------------------------------------------------------------------
+#
+# BEGIN - report Domains
+#
+# -----------------------------------------------------------------------------------------------
+# Get the collection of VerifiedDomains - it is a collection in a collection - too hard to loop through
+$DomCollection = Get-AzureADTenantDetail| select VerifiedDomains
+$Doms = $DomCollection[0].VerifiedDomains |sort-object -Property "Name"
+# Get the AZ list of all domains 
+$DomList = Get-AzureADDomain | sort-object -Property "Name"
+
+# Var will hold Capabilities value 
+$Cap = "none"
+
+# Write the Domains table header
+Add-Content -Path $RptName -Value ('<h2>Directory - Domains</h2>')
+Add-Content -Path $RptName -Value ('<table>')
+Add-Content -Path $RptName -Value " <tr>"
+Add-Content -Path $RptName -Value (Make-TH("Name") )
+Add-Content -Path $RptName -Value (Make-TH("Verified") )
+Add-Content -Path $RptName -Value (Make-TH("Root") )
+Add-Content -Path $RptName -Value (Make-TH("Initial") )
+Add-Content -Path $RptName -Value (Make-TH("Default") )
+Add-Content -Path $RptName -Value (Make-TH("Authentication") )
+Add-Content -Path $RptName -Value (Make-TH("Capabilities") )
+Add-Content -Path $RptName -Value (Make-TH("State") )
+Add-Content -Path $RptName -Value (Make-TH("Availability Status") )
+Add-Content -Path $RptName -Value (Make-TH("User Count") )
+Add-Content -Path $RptName -Value " </tr>"
+
+# Write the Domains table content
+$i = 0
+foreach ($_ in $DomList) {
+	Add-Content -Path $RptName -Value " <tr>"
+	Add-Content -Path $RptName -Value (Make-TD($DomList[$i].Name) )
+	Add-Content -Path $RptName -Value (Make-TD($DomList[$i].IsVerified) )
+	Add-Content -Path $RptName -Value (Make-TD($DomList[$i].IsRoot) )
+	Add-Content -Path $RptName -Value (Make-TD($DomList[$i].IsInitial) )
+	Add-Content -Path $RptName -Value (Make-TD($DomList[$i].IsDefault) )
+	Add-Content -Path $RptName -Value (Make-TD($DomList[$i].AuthenticationType) )
+# look up the domain in the other list and get the Capabilities
+$y=0
+foreach ($_ in $Doms) {
+	if ((($Doms[$y].Name)) -eq ($DomList[$i].Name)) {
+	  $Cap = (($Doms[$y].Name))
+    }
+	$y++
+}
+  Add-Content -Path $RptName -Value (Make-TD($Cap) )
+  Add-Content -Path $RptName -Value (Make-TD($DomList[$i].State) )
+  Add-Content -Path $RptName -Value (Make-TD($DomList[$i].AvailabilityStatus) )
+# Look for user objects with this domain suffix in their UPN
+#  $ThisDomain = "*" + ($Doms[$i].Name)
+#  $UsrCnt = (Get-AzureADUser -all $true | Where-Object {$_.UserPrincipalName -like $ThisDomain}).count
+
+  $UsrCnt = Count-UsersInDomain(($DomList[$i].Name))
+  Add-Content -Path $RptName -Value (Make-TD($UsrCnt.ToString()) )
+  Add-Content -Path $RptName -Value " </tr>"
+  $i++
+}
+Add-Content -Path $RptName -Value ('</table>')
+# -----------------------------------------------------------------------------------------------
+#
+# END - report Domains
+#
+# -----------------------------------------------------------------------------------------------
+
 
 
 # -----------------------------------------------------------------------------------------------
@@ -489,22 +448,41 @@ Add-Content -Path $RptName -Value " </table>"
 }
 
 $RptName = ".\TenantSettingsReport.html"
-$TenantName =(Get-AzureADTenantDetail).DisplayName
+
+$rHeader = '<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Tenant Settings Report</title>
+<style>
+  table, th, td {
+  border: 2px solid black;
+  border-collapse: collapse;
+}
+  th, td {
+  padding: .1em .5em;
+}
+  th {
+  text-align: left;
+}
+</style>
+</head>
+<body>
+<h1>Tenant Report for: ' + (Get-AzureADTenantDetail).DisplayName + '</h1>'
 
 $rFooter = "</body>
 </html>"
 
-Write-RptHeader ($TenantName)
+# Start by redirecting to a file
+$rHeader > $RptName
 
 Rpt-DirectorySettings
-Rpt-Domains
 
 if ((Get-AzureADTenantDetail).DirSyncEnabled) {
 	Rpt-DirSync
 }
 
 Rpt-DirectoryRoles
-
 Add-Content -Path $RptName -Value $rFooter
 
 

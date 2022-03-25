@@ -1,0 +1,624 @@
+function Count-UsersInDomain {
+	param (
+        $domData
+    )
+  if ($tData -ne "") {
+    $domUsers = 0
+    $domUsers = (Get-AzureADUser -all $true | Where-Object {$_.UserPrincipalName -like ("*" + ($domData))}).count
+  }
+  return $domUsers
+}
+
+function Write-TD { 
+	param (
+		[Parameter(Position=0)]
+        $tData,
+		[Parameter(Position=1)]
+        [boolean]$isHdr
+    )
+	if ($isHdr) {
+		$tPre = '  <th>'
+		$tPost = '  </th>'
+	}
+	else {
+		$tPre = '  <td>'
+		$tPost = '  </td>'
+	}
+	
+	if ($tData -ne "") {
+		$wt = $tPre + $tData + $tPost
+	}
+	else {
+		$wt = $tPre + '&nbsp;' + $tPost
+	}
+	Add-Content -Path $RptName -Value $wt
+}
+
+function Write-OpenTableRow {
+Add-Content -Path $RptName -Value ' <tr>'
+}
+function Write-CloseTableRow {
+Add-Content -Path $RptName -Value ' </tr>'
+}
+
+function Write-RptHeader {
+  param (
+    $TenName
+  )
+$rHeader = '<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Tenant Settings Report</title>
+<style>
+  table, th, td {
+  border: 2px solid black;
+  border-collapse: collapse;
+}
+  th, td {
+  padding: .1em .5em;
+}
+  th {
+  text-align: left;
+}
+</style>
+</head>
+<body>
+<h1>Tenant Report for: ' 
+
+  if ($RptTenant -ne "") {
+    $RptHeader = $rHeader + $TenName + '</h1>'
+  }
+  else {
+    $RptHeader = $rHeader + '&nbsp;</h1>'
+  }
+
+# Create file by redirecting to a file
+$RptHeader > $RptName
+
+  return 0
+}
+
+function Rpt-AssignedPlans {
+# -----------------------------------------------------------------------------------------------
+#
+# BEGIN - report AssignedPlans
+#
+# -----------------------------------------------------------------------------------------------
+# The AssignedPlans collection is nested in the settings, so we pull it out into its own collection
+$PlanCollection = Get-AzureADTenantDetail | select AssignedPlans
+$Plans = $PlanCollection[0].AssignedPlans |sort-object -Property "Service"
+
+# Write the AssignedPlans table
+	Add-Content -Path $RptName -Value ('<h2>Directory Settings - AssignedPlans</h2>')
+	Add-Content -Path $RptName -Value ('<table>')
+	Write-OpenTableRow
+	Write-TD -tData "Assigned Timestamp" -isHdr $True
+	Write-TD -tData "Capability Status" -isHdr $True
+	Write-TD -tData "Service" -isHdr $True
+	Write-TD -tData "Service Plan Id" -isHdr $True
+	Write-CloseTableRow
+
+$i = 0
+foreach ($_ in $Plans) {
+	Write-OpenTableRow
+	Write-TD -tData ($Plans[$i].AssignedTimestamp) -isHdr $False
+	Write-TD -tData ($Plans[$i].CapabilityStatus) -isHdr $False
+	Write-TD -tData ($Plans[$i].Service) -isHdr $False
+	Write-TD -tData ($Plans[$i].ServicePlanId) -isHdr $False
+	Write-CloseTableRow
+	$i++
+}
+Add-Content -Path $RptName -Value ('</table>')
+# -----------------------------------------------------------------------------------------------
+#
+# END - report AssignedPlans
+#
+# -----------------------------------------------------------------------------------------------
+}
+
+function Rpt-Domains {
+# -----------------------------------------------------------------------------------------------
+#
+# BEGIN - report Domains
+#
+# -----------------------------------------------------------------------------------------------
+# Get the collection of VerifiedDomains - it is a collection in a collection - too hard to loop through
+$DomCollection = Get-AzureADTenantDetail| select VerifiedDomains
+$Doms = $DomCollection[0].VerifiedDomains |sort-object -Property "Name"
+# Get the AZ list of all domains 
+$DomList = Get-AzureADDomain | sort-object -Property "Name"
+
+# Var will hold Capabilities value 
+$Cap = "none"
+
+# Write the Domains table header
+	Add-Content -Path $RptName -Value ('<h2>Directory - Domains</h2>')
+	Add-Content -Path $RptName -Value ('<table>')
+	Write-OpenTableRow
+	Write-TD -tData "Name" -isHdr $True
+	Write-TD -tData "Verified" -isHdr $True
+	Write-TD -tData "Root" -isHdr $True
+	Write-TD -tData "Initial" -isHdr $True
+	Write-TD -tData "Default" -isHdr $True
+	Write-TD -tData "Authentication" -isHdr $True
+	Write-TD -tData "Capabilities" -isHdr $True
+	Write-TD -tData "State" -isHdr $True
+	Write-TD -tData "Availability Status" -isHdr $True
+	Write-TD -tData "User Count" -isHdr $True
+	Write-CloseTableRow
+
+# Write the Domains table content
+$i = 0
+foreach ($_ in $DomList) {
+	Write-OpenTableRow
+	Write-TD -tData ($DomList[$i].Name) -isHdr $False
+	Write-TD -tData ($DomList[$i].IsVerified) -isHdr $False
+	Write-TD -tData ($DomList[$i].IsRoot) -isHdr $False
+	Write-TD -tData ($DomList[$i].IsInitial) -isHdr $False
+	Write-TD -tData ($DomList[$i].IsDefault) -isHdr $False
+	Write-TD -tData ($DomList[$i].AuthenticationType) -isHdr $False
+	
+# look up the domain in the other list and get the Capabilities
+$y=0
+foreach ($_ in $Doms) {
+	if ((($Doms[$y].Name)) -eq ($DomList[$i].Name)) {
+	  $Cap = (($Doms[$y].Name))
+    }
+	$y++
+}
+	Write-TD -tData ($Cap) -isHdr $False
+	Write-TD -tData ($DomList[$i].State) -isHdr $False
+	Write-TD -tData ($DomList[$i].AvailabilityStatus) -isHdr $False
+
+# Look for user objects with this domain suffix in their UPN
+	$UsrCnt = Count-UsersInDomain(($DomList[$i].Name))
+	Write-TD -tData ($UsrCnt) -isHdr $False
+	Write-CloseTableRow
+	$i++
+}
+Add-Content -Path $RptName -Value ('</table>')
+# -----------------------------------------------------------------------------------------------
+#
+# END - report Domains
+#
+# -----------------------------------------------------------------------------------------------
+	
+}
+
+function Rpt-DirectorySettings {
+# Get-AzureADDirectorySetting returns a collection of settion collections. 
+# we will read each  setting collection into its own variable for processing
+# Start by getting the entire collection. 
+$ds = Get-AzureADDirectorySetting
+# Then create an array of objects - 1 per setting collection in the entire collection.
+$DirSettings = [Object[]]::new($ds.count)
+#
+#  DirSettings[0] is the first collection of settings. 
+#  DirSettings[1] is the second collection of settings...
+
+# Get The other source of tenant wide settings 
+# This has a lot of fields that should be at the top of a tenant report
+$td = Get-AzureADTenantDetail
+#The privacy contact and url are in a collection - extract it. 
+$prv = $td.PrivacyProfile
+
+Add-Content -Path $RptName -Value ('<h1>Directory Settings</h1>')
+
+Add-Content -Path $RptName -Value ('<h2>Directory - General Settings</h2>')
+# start by writing the table of basic tenant settings
+Add-Content -Path $RptName -Value '<table>'
+Write-OpenTableRow
+Write-TD -tData "Display Name" -isHdr $True
+Write-TD -tData ($td.DisplayName) -isHdr $False
+Write-CloseTableRow
+Write-OpenTableRow
+Write-TD -tData "Object Id" -isHdr $True
+Write-TD -tData ($td.ObjectId) -isHdr $False
+Write-CloseTableRow
+Write-OpenTableRow
+Write-TD -tData "Object Type" -isHdr $True
+Write-TD -tData ($td.ObjectType) -isHdr $False
+Write-CloseTableRow
+Write-OpenTableRow
+Write-TD -tData "Technical Notification Mails" -isHdr $True
+Write-TD -tData ($td.TechnicalNotificationMails) -isHdr $False
+Write-CloseTableRow
+Write-OpenTableRow
+Write-TD -tData "Privacy Contact Email" -isHdr $True
+Write-TD -tData ($prv.ContactEmail) -isHdr $False
+Write-CloseTableRow
+Write-OpenTableRow
+Write-TD -tData "Privacy Statement URL" -isHdr $True
+Write-TD -tData ($prv.StatementUrl) -isHdr $False
+Write-CloseTableRow
+Write-OpenTableRow
+Write-TD -tData "DirSync Enabled" -isHdr $True
+Write-TD -tData ($td.DirSyncEnabled) -isHdr $False
+Write-CloseTableRow
+Write-OpenTableRow
+Write-TD -tData "Last DirSync Time" -isHdr $True
+Write-TD -tData ($td.CompanyLastDirSyncTime) -isHdr $False
+Write-CloseTableRow
+Write-OpenTableRow
+Write-TD -tData "Street" -isHdr $True
+Write-TD -tData ($td.Street) -isHdr $False
+Write-CloseTableRow
+Write-OpenTableRow
+Write-TD -tData "City" -isHdr $True
+Write-TD -tData ($td.City) -isHdr $False
+Write-CloseTableRow
+Write-OpenTableRow
+Write-TD -tData "State" -isHdr $True
+Write-TD -tData ($td.State) -isHdr $False
+Write-CloseTableRow
+Write-OpenTableRow
+Write-TD -tData "Country" -isHdr $True
+Write-TD -tData ($td.Country) -isHdr $False
+Write-CloseTableRow
+Write-OpenTableRow
+Write-TD -tData "Country Code" -isHdr $True
+Write-TD -tData ($td.CountryLetterCode) -isHdr $False
+Write-CloseTableRow
+Write-OpenTableRow
+Write-TD -tData "Postal Code" -isHdr $True
+Write-TD -tData ($td.PostalCode) -isHdr $False
+Write-CloseTableRow
+Write-OpenTableRow
+Write-TD -tData "Preferred Language" -isHdr $True
+Write-TD -tData ($td.PreferredLanguage) -isHdr $False
+Write-CloseTableRow
+Write-OpenTableRow
+Write-TD -tData "Telephone Number" -isHdr $True
+Write-TD -tData ($td.TelephoneNumber) -isHdr $False
+Write-CloseTableRow
+Add-Content -Path $RptName -Value '</table>'
+
+
+# -----------------------------------------------------------------------------------------------
+#
+# BEGIN - report SettingCollections
+#
+# -----------------------------------------------------------------------------------------------
+# Loop through each of the collections of settings in $ds to copy them into their own variable.  
+# Trying to access a collection within a collection is too hard! 
+# Future loops can process one collection at a time
+
+Add-Content -Path $RptName -Value ('<h2>Directory - Setting Collections</h2>')
+
+$i = 0
+foreach ($_ in $ds) {
+	$DirSettings[$i] = $ds[$i]
+	$i++
+}
+
+# Start writing the report.  
+# Outer loop places DisplayName for the settings in a title
+# Innter loop writes the settings values in a table format. 
+
+for ($i = 0; $i -lt $ds.count; $i++) {
+	# write the section title and table header
+    Add-Content -Path $RptName -Value ('<h2>' + ($DirSettings[$i].DisplayName) + '</h2>')
+    Add-Content -Path $RptName -Value '<table>'
+    Write-OpenTableRow
+	Write-TD -tData "Config Item DisplayName" -isHdr $True
+	Write-TD -tData "Value" -isHdr $True
+    Write-CloseTableRow
+	
+	for ($k = 0; $k -lt $DirSettings[$i].Values.count; $k++) {
+		# Write the current key/value pair as a table row
+		Write-OpenTableRow
+		Write-TD -tData ($DirSettings[$i].Values[$k].Name) -isHdr $False
+		Write-TD -tData ($DirSettings[$i].Values[$k].Value) -isHdr $False
+		Write-CloseTableRow
+	}
+	# End of outer loop - close the table
+	Add-Content -Path $RptName -Value "</table>"
+}
+# -----------------------------------------------------------------------------------------------
+#
+# END - report SettingCollections
+#
+# -----------------------------------------------------------------------------------------------
+
+}
+
+function Rpt-DirSync {
+# -----------------------------------------------------------------------------------------------
+#
+# BEGIN - report DirSyncFeatures
+#
+# -----------------------------------------------------------------------------------------------
+$dsc = Get-MsolDirSyncConfiguration
+$dsf = Get-MsolDirSyncFeatures
+$mco = Get-MsolCompanyInformation
+
+# Write the header
+	Add-Content -Path $RptName -Value ('<h1>DirSync / AD Connect</h1>')
+
+# Write the header
+	Add-Content -Path $RptName -Value ('<h2>Get-MsolCompanySettings</h2>')
+	Add-Content -Path $RptName -Value ('<table>')
+	Write-OpenTableRow
+	Write-TD -tData "MSOL Company Settings" -isHdr $True
+	Write-TD -tData "Value" -isHdr $True
+	Write-CloseTableRow
+	Write-OpenTableRow
+	Write-TD -tData "Last DirSync Time" -isHdr $False
+	Write-TD -tData ($mco.LastDirSyncTime) -isHdr $False
+	Write-CloseTableRow
+	Write-OpenTableRow
+	Write-TD -tData "Password Sync Enabled" -isHdr $False
+	Write-TD -tData ($mco.PasswordSynchronizationEnabled) -isHdr $False
+	Write-CloseTableRow
+	Write-OpenTableRow
+	Write-TD -tData "Last Password Sync Time" -isHdr $False
+	Write-TD -tData ($mco.LastPasswordSyncTime) -isHdr $False
+	Write-CloseTableRow
+	Write-OpenTableRow
+	Write-TD -tData "DirSync Service Account" -isHdr $False
+	Write-TD -tData ($mco.DirSyncServiceAccount) -isHdr $False
+	Write-CloseTableRow
+	Write-OpenTableRow
+	Write-TD -tData "Self Service Password Reset Enabled" -isHdr $False
+	Write-TD -tData ($mco.SelfServePasswordResetEnabled) -isHdr $False
+	Write-CloseTableRow
+	Add-Content -Path $RptName -Value "</table>"
+
+
+# Write the DirSyncFeatures table header
+
+	Add-Content -Path $RptName -Value ('<h2>Get-MsolDirSyncFeatures</h2>')
+	Add-Content -Path $RptName -Value ('<table>')
+	Write-OpenTableRow
+	Write-TD -tData "DirSync Feature" -isHdr $True
+	Write-TD -tData "Enabled" -isHdr $True
+	Write-CloseTableRow
+
+
+# Write the DirSyncFeatures table content
+$i = 0
+foreach ($_ in $dsf) {
+	Write-OpenTableRow
+	Write-TD -tData ($dsf[$i].DirSyncFeature) -isHdr $False
+	Write-TD -tData ($dsf[$i].Enabled) -isHdr $False
+	Write-CloseTableRow
+	$i++
+}
+Add-Content -Path $RptName -Value ('</table>')
+# -----------------------------------------------------------------------------------------------
+#
+# END - report DirSyncFeatures
+#
+# -----------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------
+#
+# BEGIN - report DirSyncConfiguration
+#
+# -----------------------------------------------------------------------------------------------
+
+# Write the DirSyncFeatures table header
+
+	Add-Content -Path $RptName -Value ('<h2>Get-MsolDirSyncConfiguration</h2>')
+	Add-Content -Path $RptName -Value ('<table>')
+	Write-OpenTableRow
+	Write-TD -tData "Extension Data" -isHdr $True
+	Write-TD -tData "Accidental Deletion Threshold" -isHdr $True
+	Write-TD -tData "Deletion Prevention Type" -isHdr $True
+	Write-CloseTableRow
+
+# Write the DirSyncFeatures table content
+$i = 0
+foreach ($_ in $dsc) {
+	Write-OpenTableRow
+	Write-TD -tData ($dsc[$i].ExtensionData) -isHdr $False
+	Write-TD -tData ($dsc[$i].AccidentalDeletionThreshold) -isHdr $False
+	Write-TD -tData ($dsc[$i].DeletionPreventionType) -isHdr $False
+	Write-CloseTableRow
+	$i++
+}
+Add-Content -Path $RptName -Value ('</table>')
+# -----------------------------------------------------------------------------------------------
+#
+# END - report DirSyncConfiguration
+#
+# -----------------------------------------------------------------------------------------------
+	
+}
+
+function Rpt-DirectoryRoles {
+
+Add-Content -Path $RptName -Value ('<h1>Directory Roles</h1>')
+Add-Content -Path $RptName -Value ('<h2>Azure Directory Roles - assigned</h2>')
+Add-Content -Path $RptName -Value ('<table>')
+
+$roles = Get-AzureADDirectoryRole
+foreach ($_ in $roles) {
+  $roleName = ($_.DisplayName)
+  $mbrs = Get-AzureADDirectoryRoleMember -ObjectId $_.ObjectId
+  if ($mbrs.count -ne 0) {
+    Write-OpenTableRow
+	Write-TD -tData ("Users w/ role: " + $roleName) -isHdr $True
+	Write-TD -tData "Object Type" -isHdr $True
+    Write-CloseTableRow
+
+    foreach ($_ in $mbrs) {
+		Write-OpenTableRow
+		if ($_.ObjectType -eq "ServicePrincipal") {
+			Write-TD -tData ($_.DisplayName) -isHdr $False
+		}
+		else {
+			Write-TD -tData ($_.UserPrincipalName) -isHdr $False
+		}
+
+	Write-TD -tData ($_.ObjectType) -isHdr $False
+    Write-CloseTableRow
+	}
+  }
+}
+
+Write-CloseTableRow
+Add-Content -Path $RptName -Value " </table>"
+
+Add-Content -Path $RptName -Value ('<h2>MS Office Directory Roles - assigned</h2>')
+Add-Content -Path $RptName -Value ('<table>')
+
+$roles = Get-MsolRole
+foreach ($_ in $roles) {
+$roleName = ($_.Name)
+  $mbrs = Get-MsolRoleMember -RoleObjectId $_.ObjectId
+  if ($mbrs.count -ne 0) {
+    Write-OpenTableRow
+	Write-TD -tData ("Users w/ role: " + $roleName) -isHdr $True
+	Write-TD -tData "Object Type" -isHdr $True
+    Write-CloseTableRow
+    foreach ($_ in $mbrs) {
+    Write-OpenTableRow
+	if ($_.RoleMemberType -eq "User"){
+		Write-TD -tData ($_.EmailAddress) -isHdr $False
+		Write-TD -tData ($_.RoleMemberType.ToString()) -isHdr $False
+	}
+	else {
+		Write-TD -tData ($_.DisplayName) -isHdr $False
+		Write-TD -tData ($_.RoleMemberType.ToString()) -isHdr $False
+		}
+    Write-CloseTableRow
+	}
+  }
+}
+
+Write-CloseTableRow
+Add-Content -Path $RptName -Value " </table>"
+
+}
+
+function Rpt-AdminUnits {
+
+Add-Content -Path $RptName -Value ('<h1>Administrative Units</h1>')
+	
+
+$i = 0
+$aUnits = Get-MsolAdministrativeUnit
+foreach ($_ in $aUnits) {
+	Add-Content -Path $RptName -Value ('<h2>' + ($_.DisplayName) + '</h2>')
+	Add-Content -Path $RptName -Value ('<table>')
+	Write-OpenTableRow
+	$uCnt = 0
+	$gCnt = 0
+	$GrpList = ""
+	$ThisUnit = Get-MsolAdministrativeUnitMember -AdministrativeUnitObjectId $_.ObjectId
+	$aMembers = $ThisUnit.count;
+		foreach ($_ in $ThisUnit) {
+			if (($_.AdministrativeUnitMemberType) -eq "User") {
+				$uCnt ++
+			}
+			if (($_.AdministrativeUnitMemberType) -eq "Group") {
+				$gCnt ++
+				if ($GrpList -eq "") {
+					$GrpList = ($_.DisplayName)
+				}
+				else {
+					$GrpList = ($GrpList + ", " + ($_.DisplayName))
+				}
+			}
+		}
+		Write-TD -tData "User Count:"  -isHdr $True
+		Write-TD -tData ($uCnt) -isHdr $False
+		Write-CloseTableRow
+		Write-TD -tData "Group Count:"  -isHdr $True
+		Write-TD -tData ($gCnt) -isHdr $False
+		Write-CloseTableRow
+		Write-TD -tData "Group Names:"  -isHdr $True
+		Write-TD -tData ($GrpList) -isHdr $False
+		Write-CloseTableRow
+
+	$i++
+	Add-Content -Path $RptName -Value ('</table>')
+}
+
+}
+
+function Rpt-AzAdminUnits {
+	
+$i = 0
+$aUnits = Get-AzureADMSAdministrativeUnit
+foreach ($_ in $aUnits) {
+	Add-Content -Path $RptName -Value ('<h2>' + ($_.DisplayName) + '</h2>')
+	Add-Content -Path $RptName -Value ('<table>')
+	Write-OpenTableRow
+	$uCnt = 0
+	$gCnt = 0
+	$GrpList = ""
+	$ThisUnit = Get-MsolAdministrativeUnitMember -AdministrativeUnitObjectId $_.Id
+	$aMembers = $ThisUnit.count;
+		foreach ($_ in $ThisUnit) {
+			if (($_.AdministrativeUnitMemberType) -eq "User") {
+				$uCnt ++
+			}
+			if (($_.AdministrativeUnitMemberType) -eq "Group") {
+				$gCnt ++
+				if ($GrpList -eq "") {
+					$GrpList = ($_.DisplayName)
+				}
+				else {
+					$GrpList = ($GrpList + ", " + ($_.DisplayName))
+				}
+			}
+		}
+
+		Write-TD -tData "AU Description"  -isHdr $True
+		Write-TD -tData ($_.Description) -isHdr $False
+		Write-CloseTableRow
+		Write-OpenTableRow
+		Write-TD -tData "Member Management Restricted"  -isHdr $True
+		Write-TD -tData ($_.IsMemberManagementRestricted) -isHdr $False
+		Write-CloseTableRow
+		Write-OpenTableRow
+		Write-TD -tData "Membership Rule"  -isHdr $True
+		Write-TD -tData ($_.MembershipRule) -isHdr $False
+		Write-CloseTableRow
+		Write-OpenTableRow
+		Write-TD -tData "Membership Type"  -isHdr $True
+		Write-TD -tData ($_.MembershipType) -isHdr $False
+
+		Write-CloseTableRow
+		Write-OpenTableRow
+		Write-TD -tData "User Count:"  -isHdr $True
+		Write-TD -tData ($uCnt) -isHdr $False
+		Write-CloseTableRow
+		Write-OpenTableRow
+		Write-TD -tData "Group Count:"  -isHdr $True
+		Write-TD -tData ($gCnt) -isHdr $False
+		Write-CloseTableRow
+		Write-OpenTableRow
+		Write-TD -tData "Group Names:"  -isHdr $True
+		Write-TD -tData ($GrpList) -isHdr $False
+		Write-CloseTableRow
+
+	$i++
+	Add-Content -Path $RptName -Value ('</table>')
+}
+}
+
+$RptName = ".\TenantSettingsReport.html"
+$TenantName =(Get-AzureADTenantDetail).DisplayName
+
+$rFooter = "</body>
+</html>"
+
+Write-RptHeader ($TenantName)
+
+Rpt-DirectorySettings
+Rpt-Domains
+
+if ((Get-AzureADTenantDetail).DirSyncEnabled) {
+	Rpt-DirSync
+}
+Rpt-AdminUnits
+Rpt-AzAdminUnits
+Rpt-DirectoryRoles
+Rpt-AssignedPlans
+
+Add-Content -Path $RptName -Value $rFooter
+
+
