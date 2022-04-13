@@ -54,6 +54,7 @@ $rHeader = '<!doctype html>
   table, th, td {
   border: 2px solid black;
   border-collapse: collapse;
+  margin: 0 auto;
 }
   th, td {
   padding: .1em .5em;
@@ -61,6 +62,7 @@ $rHeader = '<!doctype html>
   th {
   text-align: left;
 }
+  h2 { text-align: center; }
 </style>
 </head>
 <body>
@@ -75,8 +77,6 @@ $rHeader = '<!doctype html>
 
 # Create file by redirecting to a file
 $RptHeader > $RptName
-
-  return 0
 }
 
 function Rpt-AssignedPlans {
@@ -90,6 +90,7 @@ $PlanCollection = Get-AzureADTenantDetail | select AssignedPlans
 $Plans = $PlanCollection[0].AssignedPlans |sort-object -Property "Service"
 
 # Write the AssignedPlans table
+	Add-Content -Path $RptName -Value ('<h1>Licensing</h1>')
 	Add-Content -Path $RptName -Value ('<h2>Directory Settings - AssignedPlans</h2>')
 	Add-Content -Path $RptName -Value ('<table>')
 	Write-OpenTableRow
@@ -123,12 +124,7 @@ function Rpt-Domains {
 # BEGIN - report Domains
 #
 # -----------------------------------------------------------------------------------------------
-# Get the collection of VerifiedDomains - it is a collection in a collection - too hard to loop through
-$DomCollection = Get-AzureADTenantDetail| select VerifiedDomains
-$Doms = $DomCollection[0].VerifiedDomains |sort-object -Property "Name"
-# Get the AZ list of all domains 
-$DomList = Get-AzureADDomain | sort-object -Property "Name"
-
+#
 # Var will hold Capabilities value 
 $Cap = "none"
 
@@ -150,29 +146,30 @@ $Cap = "none"
 
 # Write the Domains table content
 $i = 0
-foreach ($_ in $DomList) {
+foreach ($_ in $AllDomains) {
 	Write-OpenTableRow
-	Write-TD -tData ($DomList[$i].Name) -isHdr $False
-	Write-TD -tData ($DomList[$i].IsVerified) -isHdr $False
-	Write-TD -tData ($DomList[$i].IsRoot) -isHdr $False
-	Write-TD -tData ($DomList[$i].IsInitial) -isHdr $False
-	Write-TD -tData ($DomList[$i].IsDefault) -isHdr $False
-	Write-TD -tData ($DomList[$i].AuthenticationType) -isHdr $False
+	Write-TD -tData ($AllDomains[$i].Name) -isHdr $False
+	Write-TD -tData ($AllDomains[$i].IsVerified) -isHdr $False
+	Write-TD -tData ($AllDomains[$i].IsRoot) -isHdr $False
+	Write-TD -tData ($AllDomains[$i].IsInitial) -isHdr $False
+	Write-TD -tData ($AllDomains[$i].IsDefault) -isHdr $False
+	Write-TD -tData ($AllDomains[$i].AuthenticationType) -isHdr $False
 	
 # look up the domain in the other list and get the Capabilities
 $y=0
-foreach ($_ in $Doms) {
-	if ((($Doms[$y].Name)) -eq ($DomList[$i].Name)) {
-	  $Cap = (($Doms[$y].Name))
+foreach ($_ in $VerifiedDomains) {
+	if ((($VerifiedDomains[$y].Name)) -eq ($AllDomains[$i].Name)) {
+	  $Cap = (($VerifiedDomains[$y].Capabilities))
     }
 	$y++
 }
 	Write-TD -tData ($Cap) -isHdr $False
-	Write-TD -tData ($DomList[$i].State) -isHdr $False
-	Write-TD -tData ($DomList[$i].AvailabilityStatus) -isHdr $False
+	Write-TD -tData ($AllDomains[$i].State) -isHdr $False
+	Write-TD -tData ($AllDomains[$i].AvailabilityStatus) -isHdr $False
 
 # Look for user objects with this domain suffix in their UPN
-	$UsrCnt = Count-UsersInDomain(($DomList[$i].Name))
+	$UsrCnt = Count-UsersInDomain(($AllDomains[$i].Name))
+	$ThisReportData.UserCount += $UsrCnt
 	Write-TD -tData ($UsrCnt) -isHdr $False
 	Write-CloseTableRow
 	$i++
@@ -190,12 +187,6 @@ function Rpt-DirectorySettings {
 # Get-AzureADDirectorySetting returns a collection of settion collections. 
 # we will read each  setting collection into its own variable for processing
 # Start by getting the entire collection. 
-$ds = Get-AzureADDirectorySetting
-# Then create an array of objects - 1 per setting collection in the entire collection.
-$DirSettings = [Object[]]::new($ds.count)
-#
-#  DirSettings[0] is the first collection of settings. 
-#  DirSettings[1] is the second collection of settings...
 
 # Get The other source of tenant wide settings 
 # This has a lot of fields that should be at the top of a tenant report
@@ -274,7 +265,9 @@ Write-TD -tData ($td.TelephoneNumber) -isHdr $False
 Write-CloseTableRow
 Add-Content -Path $RptName -Value '</table>'
 
+}
 
+function Rpt-SettingCollections {
 # -----------------------------------------------------------------------------------------------
 #
 # BEGIN - report SettingCollections
@@ -283,6 +276,14 @@ Add-Content -Path $RptName -Value '</table>'
 # Loop through each of the collections of settings in $ds to copy them into their own variable.  
 # Trying to access a collection within a collection is too hard! 
 # Future loops can process one collection at a time
+
+$ds = Get-AzureADDirectorySetting
+# Then create an array of objects - 1 per setting collection in the entire collection.
+$DirSettings = [Object[]]::new($ds.count)
+#
+#  DirSettings[0] is the first collection of settings. 
+#  DirSettings[1] is the second collection of settings...
+
 
 Add-Content -Path $RptName -Value ('<h2>Directory - Setting Collections</h2>')
 
@@ -493,7 +494,8 @@ Add-Content -Path $RptName -Value " </table>"
 }
 
 function Rpt-AdminUnits {
-	
+Add-Content -Path $RptName -Value ('<h1>Administrative Units</h1>')
+
 $i = 0
 $aUnits = Get-AzureADMSAdministrativeUnit
 foreach ($_ in $aUnits) {
@@ -554,16 +556,57 @@ foreach ($_ in $aUnits) {
 }
 }
 
-$RptName = ".\TenantSettingsReport.html"
+function Read-arConfig {
+	#This object holds counts of objects from last sucessful run if found, so define it before we populate it. 
+	if (test-path AzReporter.cfg) {
+		#read the config data to get a Json
+		$cfgValues = (Get-Content -Path ".\AzReporter.cfg" | ConvertFrom-Json)
+	}
+	else {
+		$cfgValues = @{ ReportDate = Get-Date; UserCount=0; GroupCount=0; SPCount=0; DomainsTotal=0; DomainsVerified=0; Licenses=0; Admins=0; AdminUnits=0 }
+	}
+	#convert the Json back into PoSh object 
+	return ($cfgValues)
+}
+
+function Write-arConfig {
+	Set-Content -Path ".\AzReporter.cfg" ($ThisReportData | ConvertTo-Json)
+}
+
+$LastReportData = Read-arConfig
+$ThisReportData = @{ ReportDate = Get-Date; UserCount=0; GroupCount=0; SPCount=0; DomainsTotal=0; DomainsVerified=0; Licenses=0; Admins=0; AdminUnits=0 }
 $TenantName =(Get-AzureADTenantDetail).DisplayName
+
+$RptName = (".\AzReporter - " + $TenantName + ".html")
 
 $rFooter = "</body>
 </html>"
+
+# -----------------------------------------------------------------------------------------------------
+# Get the collection of VerifiedDomains - it is a collection in a collection - too hard to loop through
+$DomCollection = Get-AzureADTenantDetail| select VerifiedDomains
+$VerifiedDomains = $DomCollection[0].VerifiedDomains |sort-object -Property "Name"
+# Get the list of all domains 
+$AllDomains = Get-AzureADDomain | sort-object -Property "Name"
+#Update current report counters
+
+# update user count by counting all users in each domain
+$i = 0
+foreach ($_ in $AllDomains) {
+	$UsrCnt = Count-UsersInDomain(($AllDomains[$i].Name))
+	$ThisReportData.UserCount += $UsrCnt
+	$i++
+}
+$ThisReportData.DomainsTotal = $AllDomains.count
+$ThisReportData.DomainsVerified = $VerifiedDomains.count
+$ThisReportData.GroupCount = (get-azureadgroup -all $true).count
+$ThisReportData.AdminUnits = (Get-AzureADMSAdministrativeUnit).count
 
 Write-RptHeader ($TenantName)
 
 Rpt-DirectorySettings
 Rpt-Domains
+Rpt-SettingCollections
 
 if ((Get-AzureADTenantDetail).DirSyncEnabled) {
 	Rpt-DirSync
@@ -574,4 +617,5 @@ Rpt-AssignedPlans
 
 Add-Content -Path $RptName -Value $rFooter
 
+Write-arConfig
 
