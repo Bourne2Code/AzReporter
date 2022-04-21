@@ -46,3 +46,26 @@ write-host "Param 1: "	$args[1]
 		$tPre = '  <td>'
 		$tPost = '  </td>'
 	}
+
+ ((Get-MsolRole |where-object {$_.Name -eq "Company Administrator"}).ObjectId.Guid).count
+ 
+ (Get-AzureADDirectoryRoleMember -ObjectId (Get-AzureADDirectoryRole |where-object {$_.DisplayName -eq "Global Administrator"}).ObjectId).count
+ 
+ 
+ $cfgValues = @{ ReportDate = (Get-Date).DateTime; UserCount=0; GroupCount=0; SPCount=0; DomainsTotal=0; DomainsVerified=0; LicenseSkus=0; GlobalAdmins=0; CompanyAdmins=0; AdminUnits=0 }
+ 
+ Set-Content -Path ".\AzReporter.cfg" ($ThisReportData | ConvertTo-Json)
+ 
+ function test-azPreview {
+	$cTest = get-command connect-azuread
+	if ($cTest.Source -eq 'AzureADPreview') {
+		$ret = $true
+		write-host 'Preview installed'
+	}
+	else {
+		$ret = $false
+		write-host 'Preview NOT installed'
+	}
+	return $ret
+ }
+ 

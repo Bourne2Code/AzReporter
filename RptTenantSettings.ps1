@@ -1,3 +1,98 @@
+<#PSScriptInfo
+ 
+.VERSION 0.1
+ 
+.AUTHOR Robert Bourne
+ 
+.COMPANYNAME Bourne2Code
+ 
+.COPYRIGHT 2022
+ 
+.TAGS Azure AzureAD Office365
+ 
+.LICENSEURI
+ 
+.PROJECTURI 
+ 
+.ICONURI
+ 
+.EXTERNALMODULEDEPENDENCIES
+ 
+.REQUIREDSCRIPTS
+ 
+.EXTERNALSCRIPTDEPENDENCIES
+ 
+.RELEASENOTES
+#>
+<#
+ 
+.DESCRIPTION Azure AD Reporter
+Will query, record, and report on a number of Azure data points easily reachable via PoSh.
+Query - Directory features, roles, settings, etc 
+Record - Product and html document representing the query and changes from previous query (queries?)
+Record - Record significant counters in a configuration history file with date(s) of collections
+
+.USAGE
+
+Script accepts one command line parameter to turn on/off the login prompts for a GA Account
+To force the login prompt:
+PS C:>AzRerporter -SignIn $true
+
+To skip the login prompt:
+PS C:>AzRerporter -SignIn $false
+
+#>
+param (
+	[Parameter(Position=0)]
+	[boolean]$SignIn
+	)
+	
+write-host "Loading..."
+
+function Confirm-PreviewModule {
+# simple /brute force test to see if AzureADPreview module is installed. 
+	$ret = $false
+	$ModTest = get-command connect-azuread*
+	if ($ModTest.Source -eq 'AzureADPreview') {
+		$ret = $true
+	}
+	return $ret
+ }
+ 
+function Confirm-MsolModule {
+# simple /brute force test to see if MSOnline module is installed. 
+	$ret = $false
+	$ModTest = get-command connect-msolservice*
+	if ($ModTest.Source -eq 'MSOnline') {
+		$ret = $true
+	}
+	return $ret
+ }
+
+function Connect-GlobalAdmin {
+
+	$pModExists = Confirm-PreviewModule
+	$mModExists = Confirm-MsolModule
+
+	if ($pModExists -and $mModExists) {
+		write-host "Modules loaded..."
+		connect-azuread
+		Connect-msolservice
+	}
+	else {
+		if (($pModExists = $false) -and ($mModExists = $false)) {
+			$eMsg = "Missing PowerShell MSOnline and AzureAD Preview Modules."
+		}
+		if (($pModExists = $false) -and ($mModExists = $true)) {
+			$eMsg = "Missing PowerShell AzureAD Preview Module."
+		}
+		if (($pModExists = $true) -and ($mModExists = $false)) {
+			$eMsg = "Missing PowerShell MSOnline Module."
+		}
+		Halt-Script -ErMsg $eMsg
+	}
+}
+
 function Count-UsersInDomain {
 	param (
         $domData
@@ -18,38 +113,52 @@ function Write-TD {
 		[Parameter(Position=2)]
         [string]$Style
     )
-	if ($isHdr) {
-		$tPre = '  <th>'
-		$tPost = '  </th>'
-	}
-	else {
-		if ($Style -ne "") {
-			$tPre = '  <td ' + $Style + '>'
+	
+	if ($Style -ne "") {
+		
+		if ($isHdr) {
+			$ElementOpen = '  <th ' + $Style + '>'
+			$ElementClose = '  </th>'
 		}
 		else {
-			$tPre = '  <td>'
+			$ElementOpen = '  <td ' + $Style + '>'
+			$ElementClose = '  </td>'
 		}
-		$tPost = '  </td>'
+	}
+	else {
+		if ($isHdr) {
+			$ElementOpen = '  <th>'
+			$ElementClose = '  </th>'
+		}
+		else {
+			$ElementOpen = '  <td>'
+			$ElementClose = '  </td>'
+		}
 	}
 	
 	if ($tData -ne "") {
-		$wt = $tPre + $tData + $tPost
+	$td = $ElementOpen + $tData + $ElementClose
 	}
 	else {
-		$wt = $tPre + '&nbsp;' + $tPost
+	$td = $ElementOpen + '&nbsp;' + $ElementClose
 	}
-	Add-Content -Path $RptName -Value $wt
+	Add-Content -Path $RptName -Value $td
 }
 
-function Write-OpenTableRow {
-Add-Content -Path $RptName -Value ' <tr>'
+function Write-TableRow {
+	param (
+		[Parameter(Position=0)]
+        [boolean]$OpenRow
+    )
+	if ($OpenRow -eq $true) {
+		Add-Content -Path $RptName -Value ' <tr>'
+	}
+	else {
+		Add-Content -Path $RptName -Value ' </tr>'
+	}
 }
 
-function Write-CloseTableRow {
-Add-Content -Path $RptName -Value ' </tr>'
-}
-
-function Write-RptHeader {
+function Open-Report {
   param (
     $TenName
   )
@@ -69,6 +178,7 @@ th { text-align: left; }
 h2 { text-align: center; }
 .ChangeUp { color: red; font-weight: bold; }
 .ChangeDn { color: green; font-weight: bold; }
+.SubHdr { color: blue; font-weight: bold; }
 </style>
 </head>
 <body>
@@ -83,6 +193,15 @@ h2 { text-align: center; }
 
 # Create file by redirecting to a file
 $RptHeader > $RptName
+}
+
+function Close-Report {
+
+$rFooter = "</body>
+</html>"
+
+	Add-Content -Path $RptName -Value $rFooter
+
 }
 
 function Rpt-DirectorySettings {
@@ -101,70 +220,70 @@ Add-Content -Path $RptName -Value ('<h1>Directory Settings</h1>')
 Add-Content -Path $RptName -Value ('<h2>Directory - General Settings</h2>')
 # start by writing the table of basic tenant settings
 Add-Content -Path $RptName -Value '<table>'
-Write-OpenTableRow
+Write-TableRow -OpenRow $true
 Write-TD -tData "Display Name" -isHdr $True
 Write-TD -tData ($td.DisplayName) -isHdr $False
-Write-CloseTableRow
-Write-OpenTableRow
+Write-TableRow -OpenRow $false
+Write-TableRow -OpenRow $true
 Write-TD -tData "Object Id" -isHdr $True
 Write-TD -tData ($td.ObjectId) -isHdr $False
-Write-CloseTableRow
-Write-OpenTableRow
+Write-TableRow -OpenRow $false
+Write-TableRow -OpenRow $true
 Write-TD -tData "Object Type" -isHdr $True
 Write-TD -tData ($td.ObjectType) -isHdr $False
-Write-CloseTableRow
-Write-OpenTableRow
+Write-TableRow -OpenRow $false
+Write-TableRow -OpenRow $true
 Write-TD -tData "Technical Notification Mails" -isHdr $True
 Write-TD -tData ($td.TechnicalNotificationMails) -isHdr $False
-Write-CloseTableRow
-Write-OpenTableRow
+Write-TableRow -OpenRow $false
+Write-TableRow -OpenRow $true
 Write-TD -tData "Privacy Contact Email" -isHdr $True
 Write-TD -tData ($prv.ContactEmail) -isHdr $False
-Write-CloseTableRow
-Write-OpenTableRow
+Write-TableRow -OpenRow $false
+Write-TableRow -OpenRow $true
 Write-TD -tData "Privacy Statement URL" -isHdr $True
 Write-TD -tData ($prv.StatementUrl) -isHdr $False
-Write-CloseTableRow
-Write-OpenTableRow
+Write-TableRow -OpenRow $false
+Write-TableRow -OpenRow $true
 Write-TD -tData "DirSync Enabled" -isHdr $True
 Write-TD -tData ($td.DirSyncEnabled) -isHdr $False
-Write-CloseTableRow
-Write-OpenTableRow
+Write-TableRow -OpenRow $false
+Write-TableRow -OpenRow $true
 Write-TD -tData "Last DirSync Time" -isHdr $True
 Write-TD -tData ($td.CompanyLastDirSyncTime) -isHdr $False
-Write-CloseTableRow
-Write-OpenTableRow
+Write-TableRow -OpenRow $false
+Write-TableRow -OpenRow $true
 Write-TD -tData "Street" -isHdr $True
 Write-TD -tData ($td.Street) -isHdr $False
-Write-CloseTableRow
-Write-OpenTableRow
+Write-TableRow -OpenRow $false
+Write-TableRow -OpenRow $true
 Write-TD -tData "City" -isHdr $True
 Write-TD -tData ($td.City) -isHdr $False
-Write-CloseTableRow
-Write-OpenTableRow
+Write-TableRow -OpenRow $false
+Write-TableRow -OpenRow $true
 Write-TD -tData "State" -isHdr $True
 Write-TD -tData ($td.State) -isHdr $False
-Write-CloseTableRow
-Write-OpenTableRow
+Write-TableRow -OpenRow $false
+Write-TableRow -OpenRow $true
 Write-TD -tData "Country" -isHdr $True
 Write-TD -tData ($td.Country) -isHdr $False
-Write-CloseTableRow
-Write-OpenTableRow
+Write-TableRow -OpenRow $false
+Write-TableRow -OpenRow $true
 Write-TD -tData "Country Code" -isHdr $True
 Write-TD -tData ($td.CountryLetterCode) -isHdr $False
-Write-CloseTableRow
-Write-OpenTableRow
+Write-TableRow -OpenRow $false
+Write-TableRow -OpenRow $true
 Write-TD -tData "Postal Code" -isHdr $True
 Write-TD -tData ($td.PostalCode) -isHdr $False
-Write-CloseTableRow
-Write-OpenTableRow
+Write-TableRow -OpenRow $false
+Write-TableRow -OpenRow $true
 Write-TD -tData "Preferred Language" -isHdr $True
 Write-TD -tData ($td.PreferredLanguage) -isHdr $False
-Write-CloseTableRow
-Write-OpenTableRow
+Write-TableRow -OpenRow $false
+Write-TableRow -OpenRow $true
 Write-TD -tData "Telephone Number" -isHdr $True
 Write-TD -tData ($td.TelephoneNumber) -isHdr $False
-Write-CloseTableRow
+Write-TableRow -OpenRow $false
 Add-Content -Path $RptName -Value '</table>'
 
 }
@@ -172,17 +291,17 @@ Add-Content -Path $RptName -Value '</table>'
 function Rpt-Changes {
 	Add-Content -Path $RptName -Value ('<h2>Directory Changes</h2>')
 	Add-Content -Path $RptName -Value '<table>'
-	Write-OpenTableRow
+	Write-TableRow -OpenRow $true
 	Write-TD -tData "Data" -isHdr $True
 	Write-TD -tData ("Last Report") -isHdr $True
 	Write-TD -tData ("This Report") -isHdr $True
-	Write-CloseTableRow
-	Write-OpenTableRow
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
 	Write-TD -tData "Report Date" -isHdr $True
 	Write-TD -tData ($LastReportData.ReportDate) -isHdr $False
 	Write-TD -tData ($ThisReportData.ReportDate) -isHdr $False
-	Write-CloseTableRow
-	Write-OpenTableRow
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
 	Write-TD -tData "Users" -isHdr $True
 	Write-TD -tData ($LastReportData.UserCount) -isHdr $False 
 	if ($LastReportData.UserCount -gt $ThisReportData.UserCount) {
@@ -192,8 +311,8 @@ function Rpt-Changes {
 		$Sty = 'class="ChangeDn"'
 	}
 	Write-TD -tData ($ThisReportData.UserCount) -isHdr $False $Sty
-	Write-CloseTableRow
-	Write-OpenTableRow
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
 	Write-TD -tData "Groups" -isHdr $True
 	Write-TD -tData ($LastReportData.GroupCount) -isHdr $False
 	if ($LastReportData.GroupCount -gt $ThisReportData.GroupCount) {
@@ -206,9 +325,9 @@ function Rpt-Changes {
 		$Sty = ''
 	}
 	Write-TD -tData ($ThisReportData.GroupCount) -isHdr $False $Sty
-	Write-CloseTableRow
-	Write-OpenTableRow
-	Write-TD -tData "SPs" -isHdr $True
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Service Principals" -isHdr $True
 	Write-TD -tData ($LastReportData.SPCount) -isHdr $False
 	if ($LastReportData.SPCount -gt $ThisReportData.SPCount) {
 		$Sty = 'class="ChangeUp"'
@@ -220,8 +339,8 @@ function Rpt-Changes {
 		$Sty = ''
 	}
 	Write-TD -tData ($ThisReportData.SPCount) -isHdr $False $Sty
-	Write-CloseTableRow
-	Write-OpenTableRow
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
 	Write-TD -tData "Domains" -isHdr $True
 	Write-TD -tData ($LastReportData.DomainsTotal) -isHdr $False
 	if ($LastReportData.DomainsTotal -gt $ThisReportData.DomainsTotal) {
@@ -234,8 +353,8 @@ function Rpt-Changes {
 		$Sty = ''
 	}
 	Write-TD -tData ($ThisReportData.DomainsTotal) -isHdr $False
-	Write-CloseTableRow
-	Write-OpenTableRow
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
 	Write-TD -tData "Verified Domains" -isHdr $True
 	Write-TD -tData ($LastReportData.DomainsVerified) -isHdr $False
 	if ($LastReportData.DomainsVerified -gt $ThisReportData.DomainsVerified) {
@@ -248,8 +367,8 @@ function Rpt-Changes {
 		$Sty = ''
 	}
 	Write-TD -tData ($ThisReportData.DomainsVerified) -isHdr $False $Sty
-	Write-CloseTableRow
-	Write-OpenTableRow
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
 	Write-TD -tData "License Skus" -isHdr $True
 	Write-TD -tData ($LastReportData.LicenseSkus) -isHdr $False
 	if ($LastReportData.LicenseSkus -gt $ThisReportData.LicenseSkus) {
@@ -262,22 +381,36 @@ function Rpt-Changes {
 		$Sty = ''
 	}
 	Write-TD -tData ($ThisReportData.LicenseSkus) -isHdr $False $Sty
-	Write-CloseTableRow
-	Write-OpenTableRow
-	Write-TD -tData "Administrators" -isHdr $True
-	Write-TD -tData ($LastReportData.Admins) -isHdr $False
-	if ($LastReportData.Admins -gt $ThisReportData.Admins) {
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Global Administrators" -isHdr $True
+	Write-TD -tData ($LastReportData.GlobalAdmins) -isHdr $False
+	if ($LastReportData.GlobalAdmins -gt $ThisReportData.GlobalAdmins) {
 		$Sty = 'class="ChangeUp"'
 	}
-	elseif ($LastReportData.Admins -lt $ThisReportData.Admins) {
+	elseif ($LastReportData.GlobalAdmins -lt $ThisReportData.GlobalAdmins) {
 		$Sty = 'class="ChangeDn"'
 	}
 	else {
 		$Sty = ''
 	}
-	Write-TD -tData ($ThisReportData.Admins) -isHdr $False $Sty
-	Write-CloseTableRow
-	Write-OpenTableRow
+	Write-TD -tData ($ThisReportData.GlobalAdmins) -isHdr $False $Sty
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Company Administrators" -isHdr $True
+	Write-TD -tData ($LastReportData.CompanyAdmins) -isHdr $False
+	if ($LastReportData.CompanyAdmins -gt $ThisReportData.CompanyAdmins) {
+		$Sty = 'class="ChangeUp"'
+	}
+	elseif ($LastReportData.CompanyAdmins -lt $ThisReportData.CompanyAdmins) {
+		$Sty = 'class="ChangeDn"'
+	}
+	else {
+		$Sty = ''
+	}
+	Write-TD -tData ($ThisReportData.CompanyAdmins) -isHdr $False $Sty
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
 	Write-TD -tData "Administrative Units" -isHdr $True
 	Write-TD -tData ($LastReportData.AdminUnits) -isHdr $False
 	if ($LastReportData.AdminUnits -gt $ThisReportData.AdminUnits) {
@@ -290,7 +423,7 @@ function Rpt-Changes {
 		$Sty = ''
 	}
 	Write-TD -tData ($ThisReportData.AdminUnits) -isHdr $False $Sty
-	Write-CloseTableRow
+	Write-TableRow -OpenRow $false
 	Add-Content -Path $RptName -Value '</table>'
 }
 
@@ -307,7 +440,7 @@ $Cap = "none"
 # Write the Domains table header
 	Add-Content -Path $RptName -Value ('<h2>Directory - Domains</h2>')
 	Add-Content -Path $RptName -Value ('<table>')
-	Write-OpenTableRow
+	Write-TableRow -OpenRow $true
 	Write-TD -tData "Name" -isHdr $True
 	Write-TD -tData "Verified" -isHdr $True
 	Write-TD -tData "Root" -isHdr $True
@@ -318,12 +451,12 @@ $Cap = "none"
 	Write-TD -tData "State" -isHdr $True
 	Write-TD -tData "Availability Status" -isHdr $True
 	Write-TD -tData "User Count" -isHdr $True
-	Write-CloseTableRow
+	Write-TableRow -OpenRow $false
 
 # Write the Domains table content
 $i = 0
 foreach ($_ in $AllDomains) {
-	Write-OpenTableRow
+	Write-TableRow -OpenRow $true
 	Write-TD -tData ($AllDomains[$i].Name) -isHdr $False
 	Write-TD -tData ($AllDomains[$i].IsVerified) -isHdr $False
 	Write-TD -tData ($AllDomains[$i].IsRoot) -isHdr $False
@@ -346,7 +479,7 @@ foreach ($_ in $VerifiedDomains) {
 # Look for user objects with this domain suffix in their UPN
 	$UsrCnt = Count-UsersInDomain(($AllDomains[$i].Name))
 	Write-TD -tData ($UsrCnt) -isHdr $False
-	Write-CloseTableRow
+	Write-TableRow -OpenRow $false
 	$i++
 }
 Add-Content -Path $RptName -Value ('</table>')
@@ -392,17 +525,17 @@ for ($i = 0; $i -lt $ds.count; $i++) {
 	# write the section title and table header
     Add-Content -Path $RptName -Value ('<h2>' + ($DirSettings[$i].DisplayName) + '</h2>')
     Add-Content -Path $RptName -Value '<table>'
-    Write-OpenTableRow
+    Write-TableRow -OpenRow $true
 	Write-TD -tData "Config Item DisplayName" -isHdr $True
 	Write-TD -tData "Value" -isHdr $True
-    Write-CloseTableRow
+    Write-TableRow -OpenRow $false
 	
 	for ($k = 0; $k -lt $DirSettings[$i].Values.count; $k++) {
 		# Write the current key/value pair as a table row
-		Write-OpenTableRow
+		Write-TableRow -OpenRow $true
 		Write-TD -tData ($DirSettings[$i].Values[$k].Name) -isHdr $False
 		Write-TD -tData ($DirSettings[$i].Values[$k].Value) -isHdr $False
-		Write-CloseTableRow
+		Write-TableRow -OpenRow $false
 	}
 	# End of outer loop - close the table
 	Add-Content -Path $RptName -Value "</table>"
@@ -431,30 +564,30 @@ $mco = Get-MsolCompanyInformation
 # Write the header
 	Add-Content -Path $RptName -Value ('<h2>Get-MsolCompanySettings</h2>')
 	Add-Content -Path $RptName -Value ('<table>')
-	Write-OpenTableRow
+	Write-TableRow -OpenRow $true
 	Write-TD -tData "MSOL Company Settings" -isHdr $True
 	Write-TD -tData "Value" -isHdr $True
-	Write-CloseTableRow
-	Write-OpenTableRow
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
 	Write-TD -tData "Last DirSync Time" -isHdr $False
 	Write-TD -tData ($mco.LastDirSyncTime) -isHdr $False
-	Write-CloseTableRow
-	Write-OpenTableRow
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
 	Write-TD -tData "Password Sync Enabled" -isHdr $False
 	Write-TD -tData ($mco.PasswordSynchronizationEnabled) -isHdr $False
-	Write-CloseTableRow
-	Write-OpenTableRow
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
 	Write-TD -tData "Last Password Sync Time" -isHdr $False
 	Write-TD -tData ($mco.LastPasswordSyncTime) -isHdr $False
-	Write-CloseTableRow
-	Write-OpenTableRow
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
 	Write-TD -tData "DirSync Service Account" -isHdr $False
 	Write-TD -tData ($mco.DirSyncServiceAccount) -isHdr $False
-	Write-CloseTableRow
-	Write-OpenTableRow
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
 	Write-TD -tData "Self Service Password Reset Enabled" -isHdr $False
 	Write-TD -tData ($mco.SelfServePasswordResetEnabled) -isHdr $False
-	Write-CloseTableRow
+	Write-TableRow -OpenRow $false
 	Add-Content -Path $RptName -Value "</table>"
 
 
@@ -462,19 +595,19 @@ $mco = Get-MsolCompanyInformation
 
 	Add-Content -Path $RptName -Value ('<h2>Get-MsolDirSyncFeatures</h2>')
 	Add-Content -Path $RptName -Value ('<table>')
-	Write-OpenTableRow
+	Write-TableRow -OpenRow $true
 	Write-TD -tData "DirSync Feature" -isHdr $True
 	Write-TD -tData "Enabled" -isHdr $True
-	Write-CloseTableRow
+	Write-TableRow -OpenRow $false
 
 
 # Write the DirSyncFeatures table content
 $i = 0
 foreach ($_ in $dsf) {
-	Write-OpenTableRow
+	Write-TableRow -OpenRow $true
 	Write-TD -tData ($dsf[$i].DirSyncFeature) -isHdr $False
 	Write-TD -tData ($dsf[$i].Enabled) -isHdr $False
-	Write-CloseTableRow
+	Write-TableRow -OpenRow $false
 	$i++
 }
 Add-Content -Path $RptName -Value ('</table>')
@@ -493,20 +626,20 @@ Add-Content -Path $RptName -Value ('</table>')
 
 	Add-Content -Path $RptName -Value ('<h2>Get-MsolDirSyncConfiguration</h2>')
 	Add-Content -Path $RptName -Value ('<table>')
-	Write-OpenTableRow
+	Write-TableRow -OpenRow $true
 	Write-TD -tData "Extension Data" -isHdr $True
 	Write-TD -tData "Accidental Deletion Threshold" -isHdr $True
 	Write-TD -tData "Deletion Prevention Type" -isHdr $True
-	Write-CloseTableRow
+	Write-TableRow -OpenRow $false
 
 # Write the DirSyncFeatures table content
 $i = 0
 foreach ($_ in $dsc) {
-	Write-OpenTableRow
+	Write-TableRow -OpenRow $true
 	Write-TD -tData ($dsc[$i].ExtensionData) -isHdr $False
 	Write-TD -tData ($dsc[$i].AccidentalDeletionThreshold) -isHdr $False
 	Write-TD -tData ($dsc[$i].DeletionPreventionType) -isHdr $False
-	Write-CloseTableRow
+	Write-TableRow -OpenRow $false
 	$i++
 }
 Add-Content -Path $RptName -Value ('</table>')
@@ -529,27 +662,21 @@ foreach ($_ in $roles) {
   $roleName = ($_.DisplayName)
   $mbrs = Get-AzureADDirectoryRoleMember -ObjectId $_.ObjectId
   if ($mbrs.count -ne 0) {
-    Write-OpenTableRow
-	Write-TD -tData ($roleName) -isHdr $True
-	Write-TD -tData "Object Type" -isHdr $True
-    Write-CloseTableRow
+    Write-TableRow -OpenRow $true
+	Write-TD -tData ($roleName) -isHdr $True 'class="SubHdr"'
+	Write-TD -tData "Object Type" -isHdr $True 'class="SubHdr"'
+    Write-TableRow -OpenRow $false
 
     foreach ($_ in $mbrs) {
-		Write-OpenTableRow
-		if ($_.ObjectType -eq "ServicePrincipal") {
-			Write-TD -tData ($_.DisplayName) -isHdr $False
-		}
-		else {
-			Write-TD -tData ($_.UserPrincipalName) -isHdr $False
-		}
-
-	Write-TD -tData ($_.ObjectType) -isHdr $False
-    Write-CloseTableRow
+		Write-TableRow -OpenRow $true
+		Write-TD -tData ($_.DisplayName) -isHdr $False
+		Write-TD -tData ($_.ObjectType) -isHdr $False
+		Write-TableRow -OpenRow $false
 	}
   }
 }
 
-Write-CloseTableRow
+Write-TableRow -OpenRow $false
 Add-Content -Path $RptName -Value " </table>"
 
 Add-Content -Path $RptName -Value ('<h2>MS Office Directory Roles Assigned</h2>')
@@ -560,12 +687,12 @@ foreach ($_ in $roles) {
 $roleName = ($_.Name)
   $mbrs = Get-MsolRoleMember -RoleObjectId $_.ObjectId
   if ($mbrs.count -ne 0) {
-    Write-OpenTableRow
-	Write-TD -tData ($roleName) -isHdr $True
-	Write-TD -tData "Object Type" -isHdr $True
-    Write-CloseTableRow
+    Write-TableRow -OpenRow $true
+	Write-TD -tData ($roleName) -isHdr $True 'class="SubHdr"'
+	Write-TD -tData "Object Type" -isHdr $True 'class="SubHdr"'
+    Write-TableRow -OpenRow $false
     foreach ($_ in $mbrs) {
-    Write-OpenTableRow
+    Write-TableRow -OpenRow $true
 	if ($_.RoleMemberType -eq "User"){
 		Write-TD -tData ($_.EmailAddress) -isHdr $False
 		Write-TD -tData ($_.RoleMemberType.ToString()) -isHdr $False
@@ -574,12 +701,12 @@ $roleName = ($_.Name)
 		Write-TD -tData ($_.DisplayName) -isHdr $False
 		Write-TD -tData ($_.RoleMemberType.ToString()) -isHdr $False
 		}
-    Write-CloseTableRow
+    Write-TableRow -OpenRow $false
 	}
   }
 }
 
-Write-CloseTableRow
+Write-TableRow -OpenRow $false
 Add-Content -Path $RptName -Value " </table>"
 
 }
@@ -592,7 +719,7 @@ $aUnits = Get-AzureADMSAdministrativeUnit
 foreach ($_ in $aUnits) {
 	Add-Content -Path $RptName -Value ('<h2>' + ($_.DisplayName) + '</h2>')
 	Add-Content -Path $RptName -Value ('<table>')
-	Write-OpenTableRow
+	Write-TableRow -OpenRow $true
 	$uCnt = 0
 	$gCnt = 0
 	$GrpList = ""
@@ -615,31 +742,31 @@ foreach ($_ in $aUnits) {
 
 		Write-TD -tData "AU Description"  -isHdr $True
 		Write-TD -tData ($_.Description) -isHdr $False
-		Write-CloseTableRow
-		Write-OpenTableRow
+		Write-TableRow -OpenRow $false
+		Write-TableRow -OpenRow $true
 		Write-TD -tData "Member Management Restricted"  -isHdr $True
 		Write-TD -tData ($_.IsMemberManagementRestricted) -isHdr $False
-		Write-CloseTableRow
-		Write-OpenTableRow
+		Write-TableRow -OpenRow $false
+		Write-TableRow -OpenRow $true
 		Write-TD -tData "Membership Rule"  -isHdr $True
 		Write-TD -tData ($_.MembershipRule) -isHdr $False
-		Write-CloseTableRow
-		Write-OpenTableRow
+		Write-TableRow -OpenRow $false
+		Write-TableRow -OpenRow $true
 		Write-TD -tData "Membership Type"  -isHdr $True
 		Write-TD -tData ($_.MembershipType) -isHdr $False
-		Write-CloseTableRow
-		Write-OpenTableRow
+		Write-TableRow -OpenRow $false
+		Write-TableRow -OpenRow $true
 		Write-TD -tData "User Count:"  -isHdr $True
 		Write-TD -tData ($uCnt) -isHdr $False
-		Write-CloseTableRow
-		Write-OpenTableRow
+		Write-TableRow -OpenRow $false
+		Write-TableRow -OpenRow $true
 		Write-TD -tData "Group Count:"  -isHdr $True
 		Write-TD -tData ($gCnt) -isHdr $False
-		Write-CloseTableRow
-		Write-OpenTableRow
+		Write-TableRow -OpenRow $false
+		Write-TableRow -OpenRow $true
 		Write-TD -tData "Group Names:"  -isHdr $True
 		Write-TD -tData ($GrpList) -isHdr $False
-		Write-CloseTableRow
+		Write-TableRow -OpenRow $false
 
 	$i++
 	Add-Content -Path $RptName -Value ('</table>')
@@ -652,25 +779,25 @@ function Rpt-Licenses {
 	Add-Content -Path $RptName -Value ('<h1>Licensing</h1>')
 	Add-Content -Path $RptName -Value ('<h2>Available Licenses</h2>')
 	Add-Content -Path $RptName -Value ('<table>')
-	Write-OpenTableRow
+	Write-TableRow -OpenRow $true
 	Write-TD -tData "License Name" -isHdr $True
 	Write-TD -tData "Active Units" -isHdr $True
 	Write-TD -tData "Consumed Units" -isHdr $True
 	Write-TD -tData "Warning Units" -isHdr $True
 	Write-TD -tData "Suspended Units" -isHdr $True
 	Write-TD -tData "Sku Id" -isHdr $True
-	Write-CloseTableRow
+	Write-TableRow -OpenRow $false
 
 	$i = 0
 	foreach ($_ in $azLicenses) {
-		Write-OpenTableRow
+		Write-TableRow -OpenRow $true
 		Write-TD -tData ($azLicenses[$i].SkuPartNumber)
 		Write-TD -tData ($azLicenses[$i].PrepaidUnits.Enabled)
 		Write-TD -tData ($azLicenses[$i].ConsumedUnits)
 		Write-TD -tData ($azLicenses[$i].PrepaidUnits.Warning)
 		Write-TD -tData ($azLicenses[$i].PrepaidUnits.Suspended)
 		Write-TD -tData ($azLicenses[$i].SkuId)
-		Write-CloseTableRow
+		Write-TableRow -OpenRow $false
 		$i++
 	}
 	Add-Content -Path $RptName -Value ('</table>')
@@ -688,21 +815,21 @@ $Plans = $PlanCollection[0].AssignedPlans |sort-object -Property "Service"
 # Write the AssignedPlans table
 	Add-Content -Path $RptName -Value ('<h2>Assigned Plans</h2>')
 	Add-Content -Path $RptName -Value ('<table>')
-	Write-OpenTableRow
+	Write-TableRow -OpenRow $true
 	Write-TD -tData "Assigned Timestamp" -isHdr $True
 	Write-TD -tData "Capability Status" -isHdr $True
 	Write-TD -tData "Service" -isHdr $True
 	Write-TD -tData "Service Plan Id" -isHdr $True
-	Write-CloseTableRow
+	Write-TableRow -OpenRow $false
 
 $i = 0
 foreach ($_ in $Plans) {
-	Write-OpenTableRow
+	Write-TableRow -OpenRow $true
 	Write-TD -tData ($Plans[$i].AssignedTimestamp) -isHdr $False
 	Write-TD -tData ($Plans[$i].CapabilityStatus) -isHdr $False
 	Write-TD -tData ($Plans[$i].Service) -isHdr $False
 	Write-TD -tData ($Plans[$i].ServicePlanId) -isHdr $False
-	Write-CloseTableRow
+	Write-TableRow -OpenRow $false
 	$i++
 }
 Add-Content -Path $RptName -Value ('</table>')
@@ -718,7 +845,7 @@ function Read-arConfig {
 		$cfgValues = (Get-Content -Path ".\AzReporter.cfg" | ConvertFrom-Json)
 	}
 	else {
-		$cfgValues = @{ ReportDate = (Get-Date).DateTime; UserCount=0; GroupCount=0; SPCount=0; DomainsTotal=0; DomainsVerified=0; LicenseSkus=0; Admins=0; AdminUnits=0 }
+		$cfgValues = @{ ReportDate = (Get-Date).DateTime; UserCount=0; GroupCount=0; SPCount=0; DomainsTotal=0; DomainsVerified=0; LicenseSkus=0; GlobalAdmins=0; CompanyAdmins=0; AdminUnits=0 }
 	}
 	#convert the Json back into PoSh object 
 	return ($cfgValues)
@@ -728,22 +855,35 @@ function Write-arConfig {
 	Set-Content -Path ".\AzReporter.cfg" ($ThisReportData | ConvertTo-Json)
 }
 
+function Halt-Script {
+	param (
+		[Parameter(Position=0)]
+        $ErMsg
+		)
+	write-host $ErMsg
+}	
+
+
+# Begin Script! 
+if ($SignIn -eq $true) {
+	Connect-GlobalAdmin
+}
+
 $LastReportData = Read-arConfig
-$ThisReportData = @{ ReportDate = (Get-Date).DateTime; UserCount=0; GroupCount=0; SPCount=0; DomainsTotal=0; DomainsVerified=0; LicenseSkus=0; Admins=0; AdminUnits=0 }
+$ThisReportData = @{ ReportDate = (Get-Date).DateTime; UserCount=0; GroupCount=0; SPCount=0; DomainsTotal=0; DomainsVerified=0; LicenseSkus=0; GlobalAdmins=0; CompanyAdmins=0; AdminUnits=0 }
 $TenantName =(Get-AzureADTenantDetail).DisplayName
 
 $RptName = (".\AzReporter - " + $TenantName + ".html")
 
-$rFooter = "</body>
-</html>"
-
 # -----------------------------------------------------------------------------------------------------
+write-host "Checking for changes since" $LastReportData.ReportDate "..."
+
 # Get the collection of VerifiedDomains - it is a collection in a collection - too hard to loop through
 $DomCollection = Get-AzureADTenantDetail| select VerifiedDomains
 $VerifiedDomains = $DomCollection[0].VerifiedDomains |sort-object -Property "Name"
 # Get the list of all domains 
 $AllDomains = Get-AzureADDomain | sort-object -Property "Name"
-#Update current report counters
+# Update current report counters
 
 # update user count by counting all users in each domain
 $i = 0
@@ -758,26 +898,37 @@ $ThisReportData.GroupCount = (get-azureadgroup -all $true).count
 $ThisReportData.AdminUnits = (Get-AzureADMSAdministrativeUnit).count
 $ThisReportData.LicenseSkus = (Get-AzureADSubscribedSku).count
 $ThisReportData.SPcount = (Get-AzureADMSServicePrincipal -all $true).count
-
+$ThisReportData.GlobalAdmins = (Get-AzureADDirectoryRoleMember -ObjectId (Get-AzureADDirectoryRole |where-object {$_.DisplayName -eq "Global Administrator"}).ObjectId).count
+$ThisReportData.CompanyAdmins = ((Get-MsolRole |where-object {$_.Name -eq "Company Administrator"}).ObjectId.Guid).count
 $azLicenses = Get-AzureADSubscribedSku
 
 
-Write-RptHeader ($TenantName)
+write-host "Creating report..."
+Open-Report ($TenantName)
 
+write-host "Writing Tenant Settings..."
 Rpt-DirectorySettings
+write-host "Changes..."
 Rpt-Changes
+write-host "Writing Domains..."
 Rpt-Domains
+write-host "Writing Setting Collections..."
 Rpt-SettingCollections
 
 if ((Get-AzureADTenantDetail).DirSyncEnabled) {
+	write-host "Writing Directory Sync..."
 	Rpt-DirSync
 }
+write-host "Writing Admin Units..."
 Rpt-AdminUnits
+write-host "Writing Directory Roles..."
 Rpt-DirectoryRoles
+write-host "Writing Licenses..."
 Rpt-Licenses
 Rpt-AssignedPlans
 
-Add-Content -Path $RptName -Value $rFooter
-
+write-host "Closing report..."
+Close-Report
+write-host "Updating tenant report config..."
 Write-arConfig
-
+write-host "Done!"
