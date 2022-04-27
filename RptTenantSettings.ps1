@@ -864,6 +864,45 @@ function Halt-Script {
 }	
 
 
+function Rpt-Apps {
+# -----------------------------------------------------------------------------------------------
+#
+# BEGIN - report Applications
+#
+# -----------------------------------------------------------------------------------------------
+
+# Write the Apps table header
+	Add-Content -Path $RptName -Value ('<h2>Directory - Applications</h2>')
+	Add-Content -Path $RptName -Value ('<table>')
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "App Name" -isHdr $True
+	Write-TD -tData "Owner" -isHdr $True
+	Write-TD -tData "Created" -isHdr $True
+	Write-TD -tData "Tags" -isHdr $True
+	Write-TD -tData "App ID" -isHdr $True
+	Write-TableRow -OpenRow $false
+
+
+	$AzApps = Get-AzureADMSApplication -all $true  |sort-object -Property "DisplayName"
+
+	$i = 0
+	for ($i = 0; $i -lt $AzApps.count; $i++) {
+		Write-TableRow -OpenRow $true
+		Write-TD -tData ($AzApps[$i].DisplayName) -isHdr $false
+		Write-TD -tData ((Get-AzureADApplicationOwner -objectID ($AzApps[$i].id)).UserPrincipalName) -isHdr $false
+		Write-TD -tData ($AzApps[$i].CreatedDateTime) -isHdr $false
+		Write-TD -tData ($AzApps[$i].DeletedDateTime) -isHdr $false
+		Write-TD -tData ($AzApps[$i].Tags) -isHdr $false
+		Write-TD -tData ($AzApps[$i].AppId) -isHdr $false
+		Write-TD -tData ($AzApps[$i].SignInAudience) -isHdr $false
+		Write-TableRow -OpenRow $false
+	}
+	Add-Content -Path $RptName -Value ('</table>')
+
+}
+
+
+
 # Begin Script! 
 if ($SignIn -eq $true) {
 	Connect-GlobalAdmin
@@ -924,6 +963,7 @@ Rpt-AdminUnits
 write-host "Writing Directory Roles..."
 Rpt-DirectoryRoles
 write-host "Writing Licenses..."
+Rpt-Apps
 Rpt-Licenses
 Rpt-AssignedPlans
 
