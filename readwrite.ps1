@@ -42,30 +42,67 @@ write-host "Param 1: "	$args[1]
 }
 
 
-	else {
-		$tPre = '  <td>'
-		$tPost = '  </td>'
-	}
 
- ((Get-MsolRole |where-object {$_.Name -eq "Company Administrator"}).ObjectId.Guid).count
- 
- (Get-AzureADDirectoryRoleMember -ObjectId (Get-AzureADDirectoryRole |where-object {$_.DisplayName -eq "Global Administrator"}).ObjectId).count
- 
- 
- $cfgValues = @{ ReportDate = (Get-Date).DateTime; UserCount=0; GroupCount=0; SPCount=0; DomainsTotal=0; DomainsVerified=0; LicenseSkus=0; GlobalAdmins=0; CompanyAdmins=0; AdminUnits=0 }
- 
- Set-Content -Path ".\AzReporter.cfg" ($ThisReportData | ConvertTo-Json)
- 
- function test-azPreview {
-	$cTest = get-command connect-azuread
-	if ($cTest.Source -eq 'AzureADPreview') {
-		$ret = $true
-		write-host 'Preview installed'
-	}
-	else {
-		$ret = $false
-		write-host 'Preview NOT installed'
-	}
-	return $ret
- }
- 
+
+
+DeviceManagementApps.Read.All                True    Read Microsoft Intune apps                    Allows the app to r…
+DeviceManagementApps.ReadWrite.All           True    Read and write Microsoft Intune apps          Allows the app to r…
+DeviceManagementManagedDevices.Read.All      True    Read devices Microsoft Intune devices         Allows the app to r…
+DeviceManagementManagedDevices.ReadWrite.All True    Read and write Microsoft Intune devices       Allows the app to r…
+DeviceManagementServiceConfig.Read.All       True    Read Microsoft Intune configuration           Allows the app to r…
+DeviceManagementServiceConfig.ReadWrite.All  True    Read and write Microsoft Intune configuration Allows the app to r…
+Directory.AccessAsUser.All                   True    Access the directory as you                   Allows the app to h…
+Directory.Read.All                           True    Read directory data                           Allows the app to r…
+Directory.ReadWrite.All                      True    Read and write directory data                 Allows the app to r…
+User.Read.All                                True    Read all users' full profiles                 Allows the app to r…
+User.ReadBasic.All                           False   Read all users' basic profiles                Allows the app to r…
+User.ReadWrite.All
+
+Connect-MgGraph -TenantID f04093b5-2ab7-4dd8-bec8-2d06b6ebed0d -scope `
+DeviceManagementApps.Read.All, `
+DeviceManagementApps.ReadWrite.All, `
+DeviceManagementManagedDevices.Read.All, `
+DeviceManagementManagedDevices.ReadWrite.All, `
+DeviceManagementServiceConfig.Read.All, `
+DeviceManagementServiceConfig.ReadWrite.All, `
+Directory.AccessAsUser.All, `
+Directory.Read.All, `
+Directory.ReadWrite.All, `
+Domain.Read.All, `
+Domain.ReadWrite.All, `
+User.Read.All, `
+User.ReadBasic.All, `
+User.ReadWrite.All
+
+
+
+$domData = "jeepster.tk"
+$domUsers = (Get-MgUser -All | Where-Object {$_.UserPrincipalName -like ("*" + ($domData))}).count
+
+Find-MgGraphCommand -command Get-MgDomain | Select -First 1 -ExpandProperty Permissions
+
+
+
+$DomCollection = Get-AzureADTenantDetail| select VerifiedDomains
+
+
+
+$DomCollection[0].VerifiedDomains |sort-object -Property "Name"
+# Get the list of all domains 
+$AllDomains = Get-MgDomain | sort-object -Property "Id"
+$VerifiedDomains = Get-MgDomain -All | Where-Object {$_.IsVerified -eq $true} | sort-object -Property "Id"
+
+	Write-TD -tData ($AllDomains[$i].Id) -isHdr $False
+	Write-TD -tData ($AllDomains[$i].IsVerified) -isHdr $False
+	Write-TD -tData ($AllDomains[$i].IsRoot) -isHdr $False
+	Write-TD -tData ($AllDomains[$i].IsInitial) -isHdr $False
+	Write-TD -tData ($AllDomains[$i].IsDefault) -isHdr $False
+	Write-TD -tData ($AllDomains[$i].AuthenticationType) -isHdr $False
+	Write-TD -tData ($AllDomains[$i].SupportedServices) -isHdr $False
+	Write-TD -tData ($AllDomains[$i].AvailabilityStatus) -isHdr $False
+
+
+
+
+
+
