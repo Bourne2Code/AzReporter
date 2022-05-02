@@ -131,87 +131,74 @@ $rFooter = "</body>
 
 }
 
-function Rpt-DirectorySettings {
-# Get-AzureADDirectorySetting returns a collection of settion collections. 
-# we will read each  setting collection into its own variable for processing
-# Start by getting the entire collection. 
-
-# Get The other source of tenant wide settings 
+function Rpt-OrgInfo {
 # This has a lot of fields that should be at the top of a tenant report
-$td = Get-AzureADTenantDetail
-#The privacy contact and url are in a collection - extract it. 
-$prv = $td.PrivacyProfile
+	$Org = Get-MgOrganization
 
-Add-Content -Path $RptName -Value ('<h1>Directory Settings</h1>')
-
-Add-Content -Path $RptName -Value ('<h2>Directory - General Settings</h2>')
-# start by writing the table of basic tenant settings
-Add-Content -Path $RptName -Value '<table>'
-Write-TableRow -OpenRow $true
-Write-TD -tData "Display Name" -isHdr $True
-Write-TD -tData ($td.DisplayName) -isHdr $False
-Write-TableRow -OpenRow $false
-Write-TableRow -OpenRow $true
-Write-TD -tData "Object Id" -isHdr $True
-Write-TD -tData ($td.ObjectId) -isHdr $False
-Write-TableRow -OpenRow $false
-Write-TableRow -OpenRow $true
-Write-TD -tData "Object Type" -isHdr $True
-Write-TD -tData ($td.ObjectType) -isHdr $False
-Write-TableRow -OpenRow $false
-Write-TableRow -OpenRow $true
-Write-TD -tData "Technical Notification Mails" -isHdr $True
-Write-TD -tData ($td.TechnicalNotificationMails) -isHdr $False
-Write-TableRow -OpenRow $false
-Write-TableRow -OpenRow $true
-Write-TD -tData "Privacy Contact Email" -isHdr $True
-Write-TD -tData ($prv.ContactEmail) -isHdr $False
-Write-TableRow -OpenRow $false
-Write-TableRow -OpenRow $true
-Write-TD -tData "Privacy Statement URL" -isHdr $True
-Write-TD -tData ($prv.StatementUrl) -isHdr $False
-Write-TableRow -OpenRow $false
-Write-TableRow -OpenRow $true
-Write-TD -tData "DirSync Enabled" -isHdr $True
-Write-TD -tData ($td.DirSyncEnabled) -isHdr $False
-Write-TableRow -OpenRow $false
-Write-TableRow -OpenRow $true
-Write-TD -tData "Last DirSync Time" -isHdr $True
-Write-TD -tData ($td.CompanyLastDirSyncTime) -isHdr $False
-Write-TableRow -OpenRow $false
-Write-TableRow -OpenRow $true
-Write-TD -tData "Street" -isHdr $True
-Write-TD -tData ($td.Street) -isHdr $False
-Write-TableRow -OpenRow $false
-Write-TableRow -OpenRow $true
-Write-TD -tData "City" -isHdr $True
-Write-TD -tData ($td.City) -isHdr $False
-Write-TableRow -OpenRow $false
-Write-TableRow -OpenRow $true
-Write-TD -tData "State" -isHdr $True
-Write-TD -tData ($td.State) -isHdr $False
-Write-TableRow -OpenRow $false
-Write-TableRow -OpenRow $true
-Write-TD -tData "Country" -isHdr $True
-Write-TD -tData ($td.Country) -isHdr $False
-Write-TableRow -OpenRow $false
-Write-TableRow -OpenRow $true
-Write-TD -tData "Country Code" -isHdr $True
-Write-TD -tData ($td.CountryLetterCode) -isHdr $False
-Write-TableRow -OpenRow $false
-Write-TableRow -OpenRow $true
-Write-TD -tData "Postal Code" -isHdr $True
-Write-TD -tData ($td.PostalCode) -isHdr $False
-Write-TableRow -OpenRow $false
-Write-TableRow -OpenRow $true
-Write-TD -tData "Preferred Language" -isHdr $True
-Write-TD -tData ($td.PreferredLanguage) -isHdr $False
-Write-TableRow -OpenRow $false
-Write-TableRow -OpenRow $true
-Write-TD -tData "Telephone Number" -isHdr $True
-Write-TD -tData ($td.TelephoneNumber) -isHdr $False
-Write-TableRow -OpenRow $false
-Add-Content -Path $RptName -Value '</table>'
+	Add-Content -Path $RptName -Value ('<h1>Directory Settings</h1>')
+	Add-Content -Path $RptName -Value ('<h2>Organization Information</h2>')
+	Add-Content -Path $RptName -Value '<table>'
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Display Name" -isHdr $True
+	Write-TD -tData ($Org.DisplayName) -isHdr $False
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Tenant Id" -isHdr $True
+	Write-TD -tData ($Org.Id) -isHdr $False
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Tenant Type" -isHdr $True
+	Write-TD -tData ($Org.TenantType) -isHdr $False
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Technical Notification Mails" -isHdr $True
+	Write-TD -tData ($Org.TechnicalNotificationMails) -isHdr $False
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Privacy Contact Email" -isHdr $True
+	Write-TD -tData ($Org.PrivacyProfile.ContactEMail) -isHdr $False
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Privacy Statement URL" -isHdr $True
+	Write-TD -tData ($Org.PrivacyProfile.StatementUrl) -isHdr $False
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "On-Premises Sync Enabled" -isHdr $True
+	Write-TD -tData ($Org.OnPremisesSyncEnabled) -isHdr $False
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Last Sync Time" -isHdr $True
+	Write-TD -tData ($Org.OnPremisesLastSyncDateTime) -isHdr $False
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Street" -isHdr $True
+	Write-TD -tData ($Org.Street) -isHdr $False
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "City" -isHdr $True
+	Write-TD -tData ($Org.City) -isHdr $False
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "State" -isHdr $True
+	Write-TD -tData ($Org.State) -isHdr $False
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Country" -isHdr $True
+	Write-TD -tData ($Org.Country) -isHdr $False
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Country Code" -isHdr $True
+	Write-TD -tData ($Org.CountryLetterCode) -isHdr $False
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Postal Code" -isHdr $True
+	Write-TD -tData ($Org.PostalCode) -isHdr $False
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Preferred Language" -isHdr $True
+	Write-TD -tData ($Org.PreferredLanguage) -isHdr $False
+	Write-TableRow -OpenRow $false
+	Add-Content -Path $RptName -Value '</table>'
 
 }
 
@@ -870,6 +857,9 @@ $RptName = (".\AzReporterMG - " + $TenantName + ".html")
 
 write-host "Creating report..."
 Open-Report ($TenantName)
+
+write-host "Writing Organization Info..."
+Rpt-OrgInfo
 
 write-host "Writing Domains..."
 Rpt-Domains

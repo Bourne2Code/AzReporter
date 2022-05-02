@@ -106,3 +106,45 @@ $VerifiedDomains = Get-MgDomain -All | Where-Object {$_.IsVerified -eq $true} | 
 
 
 
+$r = Get-MgDirectoryRole
+$rd = Get-AzureADMSRoleDefinition
+$t = Get-MgDirectoryRoleTemplate
+$at = Get-AzureADDirectoryRoleTemplate
+$mt = Get-MgDirectoryRoleTemplate
+ 
+$r[1]|fl  - user admin
+ 
+ 
+$rd[4] |fl
+
+
+Id                      : fe930be7-5e62-47db-91af-98c3a49a38b1
+OdataType               :
+Description             : Can manage all aspects of users and groups, including resetting passwords for limited admins.
+DisplayName             : User Administrator
+IsBuiltIn               : True
+ResourceScopes          : {/}
+IsEnabled               : True
+RolePermissions         : {class RolePermission {
+                            AllowedResourceActions: System.Collections.Generic.List`1[System.String]
+                            Condition:
+                          }
+                          }
+TemplateId              : fe930be7-5e62-47db-91af-98c3a49a38b1
+Version                 : 1
+InheritsPermissionsFrom : {class DirectoryRoleDefinition {
+                            Id: 88d8e3e3-8f55-4a1e-953a-9b9898b8876b
+                            OdataType:
+                            Description:
+                            DisplayName:
+                            IsBuiltIn:
+                            ResourceScopes:
+                            IsEnabled:
+                            RolePermissions:
+                            TemplateId:
+                            Version:
+                            InheritsPermissionsFrom:
+                          }
+                          }
+
+ 
