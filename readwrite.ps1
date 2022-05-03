@@ -148,3 +148,8 @@ InheritsPermissionsFrom : {class DirectoryRoleDefinition {
                           }
 
  
+ 
+ ($vals -contains "#microsoft.graph.user")
+ 
+ Get-MgDirectoryRoleMember -DirectoryRoleId 19d5d24f-46a4-4afd-aeb4-55746cce04a9
+ 

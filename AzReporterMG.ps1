@@ -1,90 +1,5 @@
 	
 write-host "Loading..."
-function Connect-GlobalAdmin {
-
-Connect-MgGraph -TenantID f04093b5-2ab7-4dd8-bec8-2d06b6ebed0d -scope `
-DeviceManagementApps.Read.All, `
-DeviceManagementApps.ReadWrite.All, `
-DeviceManagementManagedDevices.Read.All, `
-DeviceManagementManagedDevices.ReadWrite.All, `
-DeviceManagementServiceConfig.Read.All, `
-DeviceManagementServiceConfig.ReadWrite.All, `
-Directory.AccessAsUser.All, `
-Directory.Read.All, `
-Directory.ReadWrite.All, `
-Domain.Read.All, `
-Domain.ReadWrite.All, `
-User.Read.All, `
-User.ReadBasic.All, `
-User.ReadWrite.All
-
-}
-
-function Count-UsersInDomain {
-	param ($domName)
-
-# A domain name is passed from the RptDomain or other process as a parameter
-# A count of users with that domain in their UPN is performed and returned.
-
-	$duCount = (Get-MgUser -All | Where-Object {$_.UserPrincipalName -like ("*" + ($domName))}).count
-
-	return $duCount
-}
-
-function Write-TD { 
-	param (
-		[Parameter(Position=0)]
-        $tData,
-		[Parameter(Position=1)]
-        [boolean]$isHdr,
-		[Parameter(Position=2)]
-        [string]$Style
-    )
-	
-	if ($Style -ne "") {
-		
-		if ($isHdr) {
-			$ElementOpen = '  <th ' + $Style + '>'
-			$ElementClose = '  </th>'
-		}
-		else {
-			$ElementOpen = '  <td ' + $Style + '>'
-			$ElementClose = '  </td>'
-		}
-	}
-	else {
-		if ($isHdr) {
-			$ElementOpen = '  <th>'
-			$ElementClose = '  </th>'
-		}
-		else {
-			$ElementOpen = '  <td>'
-			$ElementClose = '  </td>'
-		}
-	}
-	
-	if ($tData -ne "") {
-	$td = $ElementOpen + $tData + $ElementClose
-	}
-	else {
-	$td = $ElementOpen + '&nbsp;' + $ElementClose
-	}
-	Add-Content -Path $RptName -Value $td
-}
-
-function Write-TableRow {
-	param (
-		[Parameter(Position=0)]
-        [boolean]$OpenRow
-    )
-	if ($OpenRow -eq $true) {
-		Add-Content -Path $RptName -Value ' <tr>'
-	}
-	else {
-		Add-Content -Path $RptName -Value ' </tr>'
-	}
-}
-
 function Open-Report {
   param (
     $TenName
@@ -129,6 +44,72 @@ $rFooter = "</body>
 
 	Add-Content -Path $RptName -Value $rFooter
 
+}
+
+function Write-TD { 
+	param (
+		[Parameter(Position=0)]
+        $tData,
+		[Parameter(Position=1)]
+        [boolean]$isHdr,
+		[Parameter(Position=2)]
+        [string]$Style
+    )
+
+	if ($isHdr) {
+		$ElementOpen = '  <th ' + $Style + '>'
+		$ElementClose = '  </th>'
+	}
+	else {
+		$ElementOpen = '  <td ' + $Style + '>'
+		$ElementClose = '  </td>'
+	}
+	
+	Add-Content -Path $RptName -Value ($ElementOpen + $tData + $ElementClose)
+}
+
+function Write-TableRow {
+	param (
+		[Parameter(Position=0)]
+        [boolean]$OpenRow
+    )
+	if ($OpenRow -eq $true) {
+		Add-Content -Path $RptName -Value ' <tr>'
+	}
+	else {
+		Add-Content -Path $RptName -Value ' </tr>'
+	}
+}
+
+function Connect-GlobalAdmin {
+
+Connect-MgGraph -TenantID f04093b5-2ab7-4dd8-bec8-2d06b6ebed0d -scope `
+DeviceManagementApps.Read.All, `
+DeviceManagementApps.ReadWrite.All, `
+DeviceManagementManagedDevices.Read.All, `
+DeviceManagementManagedDevices.ReadWrite.All, `
+DeviceManagementServiceConfig.Read.All, `
+DeviceManagementServiceConfig.ReadWrite.All, `
+Directory.AccessAsUser.All, `
+Directory.Read.All, `
+Directory.ReadWrite.All, `
+Domain.Read.All, `
+Domain.ReadWrite.All, `
+User.Read.All, `
+User.ReadBasic.All, `
+User.ReadWrite.All
+
+}
+
+function Count-UsersInDomain {
+	param ($domName)
+
+# A domain name is passed from the RptDomain or other process as a parameter
+# A count of users with that domain in their UPN is performed and returned.
+
+	$duCount = (Get-MgUser -All | Where-Object {$_.UserPrincipalName -like ("*" + ($domName))}).count
+
+	return $duCount
 }
 
 function Rpt-OrgInfo {
@@ -202,161 +183,6 @@ function Rpt-OrgInfo {
 
 }
 
-function Rpt-Changes {
-	Add-Content -Path $RptName -Value ('<h2>Directory Changes</h2>')
-	Add-Content -Path $RptName -Value '<table>'
-	Write-TableRow -OpenRow $true
-	Write-TD -tData "Data" -isHdr $True
-	Write-TD -tData ("Last Report") -isHdr $True
-	Write-TD -tData ("This Report") -isHdr $True
-	Write-TableRow -OpenRow $false
-	Write-TableRow -OpenRow $true
-	Write-TD -tData "Report Date" -isHdr $True
-	Write-TD -tData ($LastReportData.ReportDate) -isHdr $False
-	Write-TD -tData ($ThisReportData.ReportDate) -isHdr $False
-	Write-TableRow -OpenRow $false
-	Write-TableRow -OpenRow $true
-	Write-TD -tData "Users" -isHdr $True
-	Write-TD -tData ($LastReportData.UserCount) -isHdr $False 
-	if ($LastReportData.UserCount -gt $ThisReportData.UserCount) {
-		$Sty = 'class="ChangeUp"'
-	}
-	elseif ($LastReportData.UserCount -lt $ThisReportData.UserCount) {
-		$Sty = 'class="ChangeDn"'
-	}
-	Write-TD -tData ($ThisReportData.UserCount) -isHdr $False $Sty
-	Write-TableRow -OpenRow $false
-	Write-TableRow -OpenRow $true
-	Write-TD -tData "Groups" -isHdr $True
-	Write-TD -tData ($LastReportData.GroupCount) -isHdr $False
-	if ($LastReportData.GroupCount -gt $ThisReportData.GroupCount) {
-		$Sty = 'class="ChangeUp"'
-	}
-	elseif ($LastReportData.GroupCount -lt $ThisReportData.GroupCount) {
-		$Sty = 'class="ChangeDn"'
-	}
-	else {
-		$Sty = ''
-	}
-	Write-TD -tData ($ThisReportData.GroupCount) -isHdr $False $Sty
-	Write-TableRow -OpenRow $false
-	Write-TableRow -OpenRow $true
-	Write-TD -tData "Service Principals" -isHdr $True
-	Write-TD -tData ($LastReportData.SPCount) -isHdr $False
-	if ($LastReportData.SPCount -gt $ThisReportData.SPCount) {
-		$Sty = 'class="ChangeUp"'
-	}
-	elseif ($LastReportData.SPCount -lt $ThisReportData.SPCount) {
-		$Sty = 'class="ChangeDn"'
-	}
-	else {
-		$Sty = ''
-	}
-	Write-TD -tData ($ThisReportData.SPCount) -isHdr $False $Sty
-	Write-TableRow -OpenRow $false
-	Write-TableRow -OpenRow $true
-	Write-TD -tData "Domains" -isHdr $True
-	Write-TD -tData ($LastReportData.DomainsTotal) -isHdr $False
-	if ($LastReportData.DomainsTotal -gt $ThisReportData.DomainsTotal) {
-		$Sty = 'class="ChangeUp"'
-	}
-	elseif ($LastReportData.DomainsTotal -lt $ThisReportData.DomainsTotal) {
-		$Sty = 'class="ChangeDn"'
-	}
-	else {
-		$Sty = ''
-	}
-	Write-TD -tData ($ThisReportData.DomainsTotal) -isHdr $False
-	Write-TableRow -OpenRow $false
-	Write-TableRow -OpenRow $true
-	Write-TD -tData "Verified Domains" -isHdr $True
-	Write-TD -tData ($LastReportData.DomainsVerified) -isHdr $False
-	if ($LastReportData.DomainsVerified -gt $ThisReportData.DomainsVerified) {
-		$Sty = 'class="ChangeUp"'
-	}
-	elseif ($LastReportData.DomainsVerified -lt $ThisReportData.DomainsVerified) {
-		$Sty = 'class="ChangeDn"'
-	}
-	else {
-		$Sty = ''
-	}
-	Write-TD -tData ($ThisReportData.DomainsVerified) -isHdr $False $Sty
-	Write-TableRow -OpenRow $false
-	Write-TableRow -OpenRow $true
-	Write-TD -tData "License Skus" -isHdr $True
-	Write-TD -tData ($LastReportData.LicenseSkus) -isHdr $False
-	if ($LastReportData.LicenseSkus -gt $ThisReportData.LicenseSkus) {
-		$Sty = 'class="ChangeUp"'
-	}
-	elseif ($LastReportData.LicenseSkus -lt $ThisReportData.LicenseSkus) {
-		$Sty = 'class="ChangeDn"'
-	}
-	else {
-		$Sty = ''
-	}
-	Write-TD -tData ($ThisReportData.LicenseSkus) -isHdr $False $Sty
-	Write-TableRow -OpenRow $false
-	Write-TableRow -OpenRow $true
-	Write-TD -tData "Global Administrators" -isHdr $True
-	Write-TD -tData ($LastReportData.GlobalAdmins) -isHdr $False
-	if ($LastReportData.GlobalAdmins -gt $ThisReportData.GlobalAdmins) {
-		$Sty = 'class="ChangeUp"'
-	}
-	elseif ($LastReportData.GlobalAdmins -lt $ThisReportData.GlobalAdmins) {
-		$Sty = 'class="ChangeDn"'
-	}
-	else {
-		$Sty = ''
-	}
-	Write-TD -tData ($ThisReportData.GlobalAdmins) -isHdr $False $Sty
-	Write-TableRow -OpenRow $false
-	Write-TableRow -OpenRow $true
-	Write-TD -tData "Company Administrators" -isHdr $True
-	Write-TD -tData ($LastReportData.CompanyAdmins) -isHdr $False
-	if ($LastReportData.CompanyAdmins -gt $ThisReportData.CompanyAdmins) {
-		$Sty = 'class="ChangeUp"'
-	}
-	elseif ($LastReportData.CompanyAdmins -lt $ThisReportData.CompanyAdmins) {
-		$Sty = 'class="ChangeDn"'
-	}
-	else {
-		$Sty = ''
-	}
-	Write-TD -tData ($ThisReportData.CompanyAdmins) -isHdr $False $Sty
-	Write-TableRow -OpenRow $false
-	Write-TableRow -OpenRow $true
-	Write-TD -tData "Administrative Units" -isHdr $True
-	Write-TD -tData ($LastReportData.AdminUnits) -isHdr $False
-	if ($LastReportData.AdminUnits -gt $ThisReportData.AdminUnits) {
-		$Sty = 'class="ChangeUp"'
-	}
-	elseif ($LastReportData.AdminUnits -lt $ThisReportData.AdminUnits) {
-		$Sty = 'class="ChangeDn"'
-	}
-	else {
-		$Sty = ''
-	}
-	Write-TD -tData ($ThisReportData.AdminUnits) -isHdr $False $Sty
-	Write-TableRow -OpenRow $false
-
-	Write-TableRow -OpenRow $true
-	Write-TD -tData "Applications" -isHdr $True
-	Write-TD -tData ($LastReportData.AppCount) -isHdr $False
-	if ($LastReportData.AppCount -gt $ThisReportData.AppCount) {
-		$Sty = 'class="ChangeUp"'
-	}
-	elseif ($LastReportData.AppCount -lt $ThisReportData.AppCount) {
-		$Sty = 'class="ChangeDn"'
-	}
-	else {
-		$Sty = ''
-	}
-	Write-TD -tData ($ThisReportData.AppCount) -isHdr $False $Sty
-	Write-TableRow -OpenRow $false
-
-	Add-Content -Path $RptName -Value '</table>'
-}
-
 function Rpt-Domains {
 # -----------------------------------------------------------------------------------------------
 #
@@ -365,9 +191,11 @@ function Rpt-Domains {
 # -----------------------------------------------------------------------------------------------
 #
 # Get the list of all domains 
-$AllDomains = Get-MgDomain | sort-object -Property "Id"
 $VerifiedDomains = Get-MgDomain -All | Where-Object {$_.IsVerified -eq $true} | sort-object -Property "Id"
 $UnVerifiedDomains = Get-MgDomain -All | Where-Object {$_.IsVerified -ne $true} | sort-object -Property "Id"
+
+$ThisReportData.DomainsTotal = ($VerifiedDomains.count + $UnVerifiedDomains.count)
+$ThisReportData.DomainsVerified = $VerifiedDomains.count
 
 # Write the Domains table header
 	Add-Content -Path $RptName -Value ('<h2>Directory - Domains</h2>')
@@ -397,8 +225,7 @@ foreach ($_ in $VerifiedDomains) {
 	Write-TD -tData ($_.AvailabilityStatus) -isHdr $False
 
 # Look for user objects with this domain suffix in their UPN
-	$UsrCnt = Count-UsersInDomain(($_.Id))
-	Write-TD -tData ($UsrCnt) -isHdr $False
+	Write-TD -tData (Count-UsersInDomain(($_.Id))) -isHdr $False
 	Write-TableRow -OpenRow $false
 }
 # Write the Domains table content
@@ -414,8 +241,7 @@ foreach ($_ in $UnVerifiedDomains) {
 	Write-TD -tData ($_.AvailabilityStatus) -isHdr $False
 
 # Look for user objects with this domain suffix in their UPN
-	$UsrCnt = Count-UsersInDomain(($_.Id))
-	Write-TD -tData ($UsrCnt) -isHdr $False
+	Write-TD -tData (Count-UsersInDomain(($_.Id))) -isHdr $False
 	Write-TableRow -OpenRow $false
 }
 
@@ -589,59 +415,44 @@ Add-Content -Path $RptName -Value ('</table>')
 	
 }
 
-function Rpt-DirectoryRoles {
+function Rpt-Roles {
 
 Add-Content -Path $RptName -Value ('<h1>Directory Roles</h1>')
 Add-Content -Path $RptName -Value ('<h2>Azure Directory Roles Assigned</h2>')
 Add-Content -Path $RptName -Value ('<table>')
 
-$roles = Get-AzureADDirectoryRole
-foreach ($_ in $roles) {
-  $roleName = ($_.DisplayName)
-  $mbrs = Get-AzureADDirectoryRoleMember -ObjectId $_.ObjectId
-  if ($mbrs.count -ne 0) {
-    Write-TableRow -OpenRow $true
-	Write-TD -tData ($roleName) -isHdr $True 'class="SubHdr"'
-	Write-TD -tData "Object Type" -isHdr $True 'class="SubHdr"'
-    Write-TableRow -OpenRow $false
+$AzRoles = Get-MgDirectoryRole
 
-    foreach ($_ in $mbrs) {
+foreach ($_ in $AzRoles) {
+	$mbrs = Get-MgDirectoryRoleMember -DirectoryRoleId $_.Id
+	if ($mbrs.count -ne 0) {
 		Write-TableRow -OpenRow $true
-		Write-TD -tData ($_.DisplayName) -isHdr $False
-		Write-TD -tData ($_.ObjectType) -isHdr $False
+		Write-TD -tData ($_.DisplayName) -isHdr $True 'class="SubHdr"'
+		Write-TD -tData "Mail" -isHdr $True 'class="SubHdr"'
+		Write-TD -tData "Object Type" -isHdr $True 'class="SubHdr"'
 		Write-TableRow -OpenRow $false
-	}
-  }
-}
+		
+		if ($mbrs.count -ne 0) {
 
-Write-TableRow -OpenRow $false
-Add-Content -Path $RptName -Value " </table>"
-
-Add-Content -Path $RptName -Value ('<h2>MS Office Directory Roles Assigned</h2>')
-Add-Content -Path $RptName -Value ('<table>')
-
-$roles = Get-MsolRole
-foreach ($_ in $roles) {
-$roleName = ($_.Name)
-  $mbrs = Get-MsolRoleMember -RoleObjectId $_.ObjectId
-  if ($mbrs.count -ne 0) {
-    Write-TableRow -OpenRow $true
-	Write-TD -tData ($roleName) -isHdr $True 'class="SubHdr"'
-	Write-TD -tData "Object Type" -isHdr $True 'class="SubHdr"'
-    Write-TableRow -OpenRow $false
-    foreach ($_ in $mbrs) {
-    Write-TableRow -OpenRow $true
-	if ($_.RoleMemberType -eq "User"){
-		Write-TD -tData ($_.EmailAddress) -isHdr $False
-		Write-TD -tData ($_.RoleMemberType.ToString()) -isHdr $False
-	}
-	else {
-		Write-TD -tData ($_.DisplayName) -isHdr $False
-		Write-TD -tData ($_.RoleMemberType.ToString()) -isHdr $False
+			for ($i = 0; $i -lt $mbrs.count; $i++) {
+				Write-TableRow -OpenRow $true
+				Write-TD -tData (($mbrs[$i]).AdditionalProperties.displayName) -isHdr $False
+				if ((($mbrs[0]).AdditionalProperties).Values -contains "#microsoft.graph.user") {
+					Write-TD -tData (($mbrs[$i]).AdditionalProperties.mail) -isHdr $False
+					Write-TD -tData "User" -isHdr $False
+				}
+			}
 		}
-    Write-TableRow -OpenRow $false
+		elseif ($mbrs.count -eq 1) {
+			Write-TableRow -OpenRow $true
+			Write-TD -tData ($mbrs.AdditionalProperties.displayName) -isHdr $False
+			if ((($mbrs).AdditionalProperties).Values -contains "#microsoft.graph.user") {
+				Write-TD -tData (($mbrs).AdditionalProperties.mail) -isHdr $False
+				Write-TD -tData "User" -isHdr $False
+			}
+		}	
+			Write-TableRow -OpenRow $false
 	}
-  }
 }
 
 Write-TableRow -OpenRow $false
@@ -812,7 +623,6 @@ function Halt-Script {
 	write-host $ErMsg
 }	
 
-
 function Rpt-Apps {
 # -----------------------------------------------------------------------------------------------
 #
@@ -848,7 +658,175 @@ function Rpt-Apps {
 
 }
 
+function Rpt-Changes {
+	Add-Content -Path $RptName -Value ('<h2>Directory Changes</h2>')
+	Add-Content -Path $RptName -Value '<table>'
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Data" -isHdr $True
+	Write-TD -tData ("Last Report") -isHdr $True
+	Write-TD -tData ("This Report") -isHdr $True
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Report Date" -isHdr $True
+	Write-TD -tData ($LastReportData.ReportDate) -isHdr $False
+	Write-TD -tData ($ThisReportData.ReportDate) -isHdr $False
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Users" -isHdr $True
+	Write-TD -tData ($LastReportData.UserCount) -isHdr $False 
+	if ($LastReportData.UserCount -gt $ThisReportData.UserCount) {
+		$Sty = 'class="ChangeUp"'
+	}
+	elseif ($LastReportData.UserCount -lt $ThisReportData.UserCount) {
+		$Sty = 'class="ChangeDn"'
+	}
+	Write-TD -tData ($ThisReportData.UserCount) -isHdr $False $Sty
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Groups" -isHdr $True
+	Write-TD -tData ($LastReportData.GroupCount) -isHdr $False
+	if ($LastReportData.GroupCount -gt $ThisReportData.GroupCount) {
+		$Sty = 'class="ChangeUp"'
+	}
+	elseif ($LastReportData.GroupCount -lt $ThisReportData.GroupCount) {
+		$Sty = 'class="ChangeDn"'
+	}
+	else {
+		$Sty = ''
+	}
+	Write-TD -tData ($ThisReportData.GroupCount) -isHdr $False $Sty
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Service Principals" -isHdr $True
+	Write-TD -tData ($LastReportData.SPCount) -isHdr $False
+	if ($LastReportData.SPCount -gt $ThisReportData.SPCount) {
+		$Sty = 'class="ChangeUp"'
+	}
+	elseif ($LastReportData.SPCount -lt $ThisReportData.SPCount) {
+		$Sty = 'class="ChangeDn"'
+	}
+	else {
+		$Sty = ''
+	}
+	Write-TD -tData ($ThisReportData.SPCount) -isHdr $False $Sty
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Domains" -isHdr $True
+	Write-TD -tData ($LastReportData.DomainsTotal) -isHdr $False
+	if ($LastReportData.DomainsTotal -gt $ThisReportData.DomainsTotal) {
+		$Sty = 'class="ChangeUp"'
+	}
+	elseif ($LastReportData.DomainsTotal -lt $ThisReportData.DomainsTotal) {
+		$Sty = 'class="ChangeDn"'
+	}
+	else {
+		$Sty = ''
+	}
+	Write-TD -tData ($ThisReportData.DomainsTotal) -isHdr $False
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Verified Domains" -isHdr $True
+	Write-TD -tData ($LastReportData.DomainsVerified) -isHdr $False
+	if ($LastReportData.DomainsVerified -gt $ThisReportData.DomainsVerified) {
+		$Sty = 'class="ChangeUp"'
+	}
+	elseif ($LastReportData.DomainsVerified -lt $ThisReportData.DomainsVerified) {
+		$Sty = 'class="ChangeDn"'
+	}
+	else {
+		$Sty = ''
+	}
+	Write-TD -tData ($ThisReportData.DomainsVerified) -isHdr $False $Sty
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "License Skus" -isHdr $True
+	Write-TD -tData ($LastReportData.LicenseSkus) -isHdr $False
+	if ($LastReportData.LicenseSkus -gt $ThisReportData.LicenseSkus) {
+		$Sty = 'class="ChangeUp"'
+	}
+	elseif ($LastReportData.LicenseSkus -lt $ThisReportData.LicenseSkus) {
+		$Sty = 'class="ChangeDn"'
+	}
+	else {
+		$Sty = ''
+	}
+	Write-TD -tData ($ThisReportData.LicenseSkus) -isHdr $False $Sty
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Global Administrators" -isHdr $True
+	Write-TD -tData ($LastReportData.GlobalAdmins) -isHdr $False
+	if ($LastReportData.GlobalAdmins -gt $ThisReportData.GlobalAdmins) {
+		$Sty = 'class="ChangeUp"'
+	}
+	elseif ($LastReportData.GlobalAdmins -lt $ThisReportData.GlobalAdmins) {
+		$Sty = 'class="ChangeDn"'
+	}
+	else {
+		$Sty = ''
+	}
+	Write-TD -tData ($ThisReportData.GlobalAdmins) -isHdr $False $Sty
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Company Administrators" -isHdr $True
+	Write-TD -tData ($LastReportData.CompanyAdmins) -isHdr $False
+	if ($LastReportData.CompanyAdmins -gt $ThisReportData.CompanyAdmins) {
+		$Sty = 'class="ChangeUp"'
+	}
+	elseif ($LastReportData.CompanyAdmins -lt $ThisReportData.CompanyAdmins) {
+		$Sty = 'class="ChangeDn"'
+	}
+	else {
+		$Sty = ''
+	}
+	Write-TD -tData ($ThisReportData.CompanyAdmins) -isHdr $False $Sty
+	Write-TableRow -OpenRow $false
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Administrative Units" -isHdr $True
+	Write-TD -tData ($LastReportData.AdminUnits) -isHdr $False
+	if ($LastReportData.AdminUnits -gt $ThisReportData.AdminUnits) {
+		$Sty = 'class="ChangeUp"'
+	}
+	elseif ($LastReportData.AdminUnits -lt $ThisReportData.AdminUnits) {
+		$Sty = 'class="ChangeDn"'
+	}
+	else {
+		$Sty = ''
+	}
+	Write-TD -tData ($ThisReportData.AdminUnits) -isHdr $False $Sty
+	Write-TableRow -OpenRow $false
+
+	Write-TableRow -OpenRow $true
+	Write-TD -tData "Applications" -isHdr $True
+	Write-TD -tData ($LastReportData.AppCount) -isHdr $False
+	if ($LastReportData.AppCount -gt $ThisReportData.AppCount) {
+		$Sty = 'class="ChangeUp"'
+	}
+	elseif ($LastReportData.AppCount -lt $ThisReportData.AppCount) {
+		$Sty = 'class="ChangeDn"'
+	}
+	else {
+		$Sty = ''
+	}
+	Write-TD -tData ($ThisReportData.AppCount) -isHdr $False $Sty
+	Write-TableRow -OpenRow $false
+
+	Add-Content -Path $RptName -Value '</table>'
+}
+
 Connect-GlobalAdmin
+
+$ThisReportData = @{ `
+	ReportDate = (Get-Date).DateTime; `
+	UserCount=0; `
+	GroupCount=0; `
+	SPCount=0; `
+	DomainsTotal=0; `
+	DomainsVerified=0; `
+	LicenseSkus=0; `
+	GlobalAdmins=0; `
+	CompanyAdmins=0; `
+	AdminUnits=0; `
+}
 
 $TenantName =(Get-MgOrganization).DisplayName
 
@@ -863,6 +841,9 @@ Rpt-OrgInfo
 
 write-host "Writing Domains..."
 Rpt-Domains
+
+write-host "Writing Roles..."
+Rpt-Roles
 
 write-host "Closing report..."
 Close-Report
