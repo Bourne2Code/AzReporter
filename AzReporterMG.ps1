@@ -432,26 +432,25 @@ foreach ($_ in $AzRoles) {
 		Write-TD -tData "Object Type" -isHdr $True 'class="SubHdr"'
 		Write-TableRow -OpenRow $false
 		
-		if ($mbrs.count -ne 0) {
-
+		if ($mbrs.count -gt 1) {
 			for ($i = 0; $i -lt $mbrs.count; $i++) {
 				Write-TableRow -OpenRow $true
 				Write-TD -tData (($mbrs[$i]).AdditionalProperties.displayName) -isHdr $False
+				Write-TD -tData (($mbrs[$i]).AdditionalProperties.mail) -isHdr $False
 				if ((($mbrs[0]).AdditionalProperties).Values -contains "#microsoft.graph.user") {
-					Write-TD -tData (($mbrs[$i]).AdditionalProperties.mail) -isHdr $False
 					Write-TD -tData "User" -isHdr $False
 				}
 			}
 		}
-		elseif ($mbrs.count -eq 1) {
+		if ($mbrs.count -eq 1) {
 			Write-TableRow -OpenRow $true
 			Write-TD -tData ($mbrs.AdditionalProperties.displayName) -isHdr $False
+			Write-TD -tData (($mbrs).AdditionalProperties.mail) -isHdr $False
 			if ((($mbrs).AdditionalProperties).Values -contains "#microsoft.graph.user") {
-				Write-TD -tData (($mbrs).AdditionalProperties.mail) -isHdr $False
 				Write-TD -tData "User" -isHdr $False
 			}
 		}	
-			Write-TableRow -OpenRow $false
+		Write-TableRow -OpenRow $false
 	}
 }
 
