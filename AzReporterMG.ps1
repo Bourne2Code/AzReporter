@@ -425,6 +425,7 @@ $AzRoles = Get-MgDirectoryRole
 
 foreach ($_ in $AzRoles) {
 	$mbrs = Get-MgDirectoryRoleMember -DirectoryRoleId $_.Id
+
 	if ($mbrs.count -ne 0) {
 		Write-TableRow -OpenRow $true
 		Write-TD -tData ($_.DisplayName) -isHdr $True 'class="SubHdr"'
@@ -434,19 +435,30 @@ foreach ($_ in $AzRoles) {
 		
 		if ($mbrs.count -gt 1) {
 			for ($i = 0; $i -lt $mbrs.count; $i++) {
+				$kp = $mbrs[$i].AdditionalProperties
+				$vals = $kp.Keys|foreach{$kp[$_]}
 				Write-TableRow -OpenRow $true
 				Write-TD -tData (($mbrs[$i]).AdditionalProperties.displayName) -isHdr $False
 				Write-TD -tData (($mbrs[$i]).AdditionalProperties.mail) -isHdr $False
-				if ((($mbrs[0]).AdditionalProperties).Values -contains "#microsoft.graph.user") {
+				if ((Select-String -InputObject $vals[0] -Pattern 'group' -CaseSensitive -SimpleMatch) -ne $null) {
+					Write-TD -tData "Group" -isHdr $False
+				}
+				if ((Select-String -InputObject $vals[0] -Pattern 'user' -CaseSensitive -SimpleMatch) -ne $null) {
 					Write-TD -tData "User" -isHdr $False
 				}
 			}
 		}
 		if ($mbrs.count -eq 1) {
+			$kp = $mbrs.AdditionalProperties
+			$vals = $kp.Keys|foreach{$kp[$_]}
+
 			Write-TableRow -OpenRow $true
 			Write-TD -tData ($mbrs.AdditionalProperties.displayName) -isHdr $False
 			Write-TD -tData (($mbrs).AdditionalProperties.mail) -isHdr $False
-			if ((($mbrs).AdditionalProperties).Values -contains "#microsoft.graph.user") {
+			if ((Select-String -InputObject $vals[0] -Pattern 'group' -CaseSensitive -SimpleMatch) -ne $null) {
+				Write-TD -tData "Group" -isHdr $False
+			}
+			if ((Select-String -InputObject $vals[0] -Pattern 'user' -CaseSensitive -SimpleMatch) -ne $null) {
 				Write-TD -tData "User" -isHdr $False
 			}
 		}	

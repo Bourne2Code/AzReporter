@@ -153,3 +153,31 @@ InheritsPermissionsFrom : {class DirectoryRoleDefinition {
  
  Get-MgDirectoryRoleMember -DirectoryRoleId 19d5d24f-46a4-4afd-aeb4-55746cce04a9
  
+ 
+ Get-MgDirectoryObjectById -Ids 
+ 
+ 
+$AzRoles = Get-MgDirectoryRole
+$mbrs = Get-MgDirectoryRoleMember -DirectoryRoleId $AzRoles[9].id
+$kp = $mbrs.AdditionalProperties
+$vals = $kp.Keys|foreach{$kp[$_]}
+(Select-String -InputObject $vals[0] -Pattern 'group' -CaseSensitive -SimpleMatch) -ne $null
+
+
+Get-MgServicePrincipal
+
+25e93fbd-6cb8-4186-8e18-e3a5c47c197f Salesforce
+
+Get-MgServicePrincipal -ServicePrincipalId 25e93fbd-6cb8-4186-8e18-e3a5c47c197f 
+
+Get-MgServicePrincipalAppRoleAssignment -ServicePrincipalId 25e93fbd-6cb8-4186-8e18-e3a5c47c197f 
+
+foreach ($_ in $spList) {
+	write-host $_.Id
+	write-host $_.DisplayName
+	write-host $_.AppRoles
+}
+
+$spList[1]
+
+$RoleList = $spList[23].AppRoles
